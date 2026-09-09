@@ -23,6 +23,20 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
 }
 
 pub fn build_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<Wry>> {
+    let cfg = app.state::<crate::AppState>().cfg.lock().unwrap().clone();
+    let mut services = SubmenuBuilder::new(app, "Сервисы");
+    for (id, label) in [("claude", "Claude"), ("codex", "Codex"), ("cursor", "Cursor"), ("gemini", "Antigravity")] {
+        let mut service = SubmenuBuilder::new(app, label);
+        for (value, title, mode) in [("auto", "Авто", crate::config::ProviderMode::Auto),
+            ("show", "Показывать", crate::config::ProviderMode::Show),
+            ("hide", "Скрыть", crate::config::ProviderMode::Hide)] {
+            let item = CheckMenuItemBuilder::with_id(format!("provider-{id}-{value}"), title)
+                .checked(cfg.provider_mode(id) == mode).build(app)?;
+            service = service.item(&item);
+        }
+        services = services.item(&service.build()?);
+    }
+    let services = services.build()?;
     let install = MenuItemBuilder::with_id("install", tr(lang, "install")).build(app)?;
     let uninstall = MenuItemBuilder::with_id("uninstall", tr(lang, "uninstall")).build(app)?;
     let l_auto = CheckMenuItemBuilder::with_id("lang-auto", tr(lang, "lang_auto"))
@@ -51,6 +65,8 @@ pub fn build_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<Wry>> {
         .build(app)?;
     let quit = MenuItemBuilder::with_id("quit", tr(lang, "quit")).build(app)?;
     MenuBuilder::new(app)
+        .item(&services)
+        .separator()
         .items(&[&install, &uninstall])
         .separator()
         .item(&lang_menu)
@@ -77,6 +93,30 @@ fn refresh_menu(app: &AppHandle) {
 }
 
 fn handle(app: &AppHandle, id: &str) {
+    if let Some(choice) = id.strip_prefix("provider-") {
+        if let Some((provider, value)) = choice.rsplit_once('-') {
+            if !crate::glyphs::IDS.contains(&provider) { return; }
+            let mode = match value {
+                "auto" => crate::config::ProviderMode::Auto,
+                "show" => crate::config::ProviderMode::Show,
+                "hide" => crate::config::ProviderMode::Hide,
+                _ => return,
+            };
+            let st = app.state::<crate::AppState>();
+            let mut cfg = st.cfg.lock().unwrap();
+            if cfg.provider_mode(provider) == mode { return; }
+            let mut next = cfg.clone();
+            next.providers.insert(provider.into(), mode);
+            let saved = serde_json::to_string_pretty(&next).map_err(|e| e.to_string())
+                .and_then(|text| std::fs::write(crate::config::config_path(), text).map_err(|e| e.to_string()));
+            if let Err(error) = saved { notice(app, Err(error)); return; }
+            *cfg = next;
+            drop(cfg);
+            // Restart drains in-flight requests and drops all hidden-provider workers/caches.
+            app.restart();
+        }
+        return;
+    }
     match id {
         "install" => notice(app, hooks_install::install()),
         "uninstall" => notice(app, hooks_install::uninstall()),

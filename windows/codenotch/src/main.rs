@@ -24,7 +24,7 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Logical size of the notch window: the 70 pt pill column on the right plus room for the hover card on the left.
 pub const NOTCH_W: f64 = 340.0;
 /// Hand-bumped build tag, written to run.log at startup so a log can always be matched to the exe that wrote it.
-pub const BUILD: &str = "r31";
+pub const BUILD: &str = "r32-compact-providers";
 pub const NOTCH_H: f64 = 460.0; // 300 clipped the card once it held three window blocks plus the session list
 
 pub struct AppState {
@@ -39,6 +39,16 @@ pub struct AppState {
     pub glyphs: Mutex<std::collections::HashMap<String, glyphs::Glyph>>,
     /// Working state of the non-Claude providers (Cursor reports it; Codex and Antigravity are inferred from recent writes)
     pub activity: Mutex<Vec<activity::Activity>>,
+}
+
+#[tauri::command]
+fn get_provider_visibility() -> std::collections::BTreeMap<String, bool> {
+    glyphs::IDS.into_iter().map(|id| (id.into(), config::provider_enabled(id))).collect()
+}
+
+fn initial_usage(id: &str, load: impl FnOnce() -> usage::UsageSnapshot) -> usage::UsageSnapshot {
+    if config::provider_enabled(id) { load() }
+    else { usage::UsageSnapshot { status: "absent".into(), ..Default::default() } }
 }
 
 fn resolved_lang(raw: &str) -> String {
@@ -596,14 +606,15 @@ fn main() {
         .manage(AppState {
             store: Mutex::new(Default::default()),
             cfg: Mutex::new(cfg),
-            usage: Mutex::new(usage::load_persisted()),
-            codex: Mutex::new(codex::load_persisted()),
-            cursor: Mutex::new(cursor::load_persisted()),
-            antigravity: Mutex::new(antigravity::load_persisted()),
+            usage: Mutex::new(initial_usage("claude", usage::load_persisted)),
+            codex: Mutex::new(initial_usage("codex", codex::load_persisted)),
+            cursor: Mutex::new(initial_usage("cursor", cursor::load_persisted)),
+            antigravity: Mutex::new(initial_usage("gemini", antigravity::load_persisted)),
             glyphs: Mutex::new(Default::default()),
             activity: Mutex::new(Vec::new()),
         })
         .invoke_handler(tauri::generate_handler![
+            get_provider_visibility,
             get_state,
             get_usage,
             get_codex,
@@ -632,11 +643,12 @@ fn main() {
             }
             tray::setup(&handle)?;
             server::start(handle.clone(), port);
-            watcher::start(handle.clone());
-            usage::start(handle.clone());
-            codex::start(handle.clone());
-            cursor::start(handle.clone());
-            antigravity::start(handle.clone());
+            let enabled = get_provider_visibility();
+            applog(&format!("provider workers: {enabled:?}"));
+            if enabled["claude"] { watcher::start(handle.clone()); usage::start(handle.clone()); }
+            if enabled["codex"] { codex::start(handle.clone()); }
+            if enabled["cursor"] { cursor::start(handle.clone()); }
+            if enabled["gemini"] { antigravity::start(handle.clone()); }
             activity::start(handle.clone());
             // Collecting glyphs may read icon resources out of a few executables; do it off the main thread and push when done
             let gh = handle.clone();

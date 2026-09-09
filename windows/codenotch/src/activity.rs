@@ -518,18 +518,22 @@ fn antigravity_activity() -> Vec<Activity> {
 
 #[derive(Clone, Copy, Default)]
 pub struct Presence {
+    claude: bool,
     cursor: bool,
     codex: bool,
     gemini: bool,
 }
 
 fn presence() -> Presence {
-    Presence { cursor: crate::cursor::present(), codex: crate::codex::present(), gemini: crate::antigravity::present() }
+    Presence { claude: crate::config::provider_enabled("claude"),
+        cursor: crate::config::provider_enabled("cursor"),
+        codex: crate::config::provider_enabled("codex"),
+        gemini: crate::config::provider_enabled("gemini") }
 }
 
 fn read_all(p: Presence, ctx: &mut Ctx) -> Vec<Activity> {
     let mut all = Vec::new();
-    all.extend(claude_activity());
+    if p.claude { all.extend(claude_activity()); }
     if p.cursor {
         all.extend(cursor_activity(ctx));
     }
@@ -605,7 +609,7 @@ pub fn start(app: AppHandle) {
                 // Log the first 20 state changes (with the Codex raw material) so thresholds can be calibrated
                 static LOGGED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
                 if LOGGED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 20 {
-                    crate::applog(&format!("activity: {:?} | {}", found.iter().map(|a| format!("{}:{}", a.provider, a.state)).collect::<Vec<_>>(), probe()));
+                    crate::applog(&format!("activity: {:?}", found.iter().map(|a| format!("{}:{}", a.provider, a.state)).collect::<Vec<_>>()));
                 }
                 last = found.clone();
                 {

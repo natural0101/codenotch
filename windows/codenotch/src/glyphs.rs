@@ -114,7 +114,7 @@ fn from_file(p: &Path) -> Option<Glyph> {
 }
 
 /// Candidate executables of the installed apps (Windows); MSIX store versions live under WindowsApps where a normal process cannot read them, and that is fine
-fn app_candidates(id: &str) -> Vec<PathBuf> {
+pub(crate) fn app_candidates(id: &str) -> Vec<PathBuf> {
     let mut v = Vec::new();
     let Some(local) = dirs::data_local_dir() else { return v };
     let programs = local.join("Programs");
@@ -247,6 +247,7 @@ pub fn collect() -> HashMap<String, Glyph> {
     let mut map = HashMap::new();
     let dirs = glyph_dirs();
     for id in IDS {
+        if !crate::config::provider_enabled(id) { continue; }
         let mut found: Option<Glyph> = None;
         'dirs: for d in &dirs {
             for ext in ["svg", "png"] {

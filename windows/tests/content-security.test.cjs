@@ -21,7 +21,7 @@ test('usage refreshes preserve the running indicator and do not reset its animat
   const classList = {toggle(){}};
   const elements = {'svg.ring':ring,'.pct':{},'.glyph':{classList},'.ringwrap':{classList},'.activity-indicator':indicator};
   const cell = {querySelector:selector=>elements[selector]};
-  const pill = {dataset:{cells:'codex:-'},querySelector:()=>cell,set innerHTML(value){throw new Error('Cell was recreated');}};
+  const pill = {style:{},dataset:{cells:'codex:-'},querySelector:()=>cell,set innerHTML(value){throw new Error('Cell was recreated');}};
   const snapshot = {status:'ok',windows:[{used:0.2}]};
   const c = vm.createContext({pill,glyphs:{},providers:()=>[{id:'codex',snap:snapshot}],
     headlineOf:s=>s.windows[0],workState:()=>workState,TRACK:'#333',tone:()=>'#fff',staleOf:()=>false});
@@ -72,9 +72,40 @@ test('usage card escapes provider notes and labels', () => {
   const c = vm.createContext({document:{getElementById:()=>card}, hoverId:'codex', stateSnap:{sessions:[]}, activity:[], placeCard:()=>{}, glyphHtml:()=>'', staleOf:()=>false, tone:()=>'', resetCopy:()=>'',
     providers:()=>[{id:'codex',name:'Codex',snap:{status:'ok',windows:[{label:'<img onerror="alert(1)">',used:0.5}],note:'<svg onload="alert(1)">',fetched_at:0}}]});
   const fn = script.slice(script.indexOf('function renderCard()'),script.indexOf('// The card follows'));
-  vm.runInContext(escapeFunction+'\n'+fn+'\nrenderCard();', c);
+  const tasks=script.slice(script.indexOf('const expandedProviders='),script.indexOf('function renderCard()'));
+  vm.runInContext(escapeFunction+'\n'+tasks+'\n'+fn+'\nrenderCard();', c);
   assert.ok(!card.innerHTML.includes('<svg') && !card.innerHTML.includes('<img'));
   assert.ok(card.innerHTML.includes('&lt;svg') && card.innerHTML.includes('&lt;img'));
+});
+test('compact tasks truncate text, keep status separate, and expand beyond three', () => {
+  const c=vm.createContext({AMBER:'#fb0',RUNGREEN:'#0f0',stateSnap:{sessions:[]},
+    activity:Array.from({length:5},(_,i)=>({provider:'codex',state:i===4?'waiting':'busy',name:'Задача '+i+' <img onerror="x"> '+ 'длинный текст '.repeat(100)}))});
+  const tasks=script.slice(script.indexOf('const expandedProviders='),script.indexOf('function renderCard()'));
+  vm.runInContext(escapeFunction+'\n'+tasks,c);
+  const compact=c.renderTasks('codex');
+  assert.equal((compact.match(/class="s-row"/g)||[]).length,3);
+  assert.ok(compact.includes('Ещё 2'));
+  assert.ok(compact.indexOf('Ждёт ответа')<compact.indexOf('Работает'));
+  assert.ok(!compact.includes('<img'));
+  assert.equal(Array.from(c.shortTaskName('я'.repeat(1000))).length,88);
+  assert.ok(compact.includes('class="s-title"') && compact.includes('class="s-status"'));
+  vm.runInContext("expandedProviders.add('codex')",c);
+  const expanded=c.renderTasks('codex');
+  assert.equal((expanded.match(/class="s-row"/g)||[]).length,5);
+  assert.ok(expanded.includes('Свернуть'));
+  vm.runInContext("expandedProviders.clear()",c);
+  assert.equal((c.renderTasks('codex').match(/class="s-row"/g)||[]).length,3);
+  c.stateSnap.sessions=[{state:'idle',title:'Idle'},{state:'done',title:'Done'},{state:'running',title:'Active'}];
+  assert.equal(c.taskRows('claude').length,1);
+  assert.equal(c.taskRows('claude')[0].name,'Active');
+});
+test('hidden providers disappear, forced providers remain without data, all-hidden is valid', () => {
+  const c=vm.createContext({usage:{status:'ok'},codexSnap:{status:'ok'},cursorSnap:{status:'absent'},agSnap:{status:'absent'}});
+  const providers=script.slice(script.indexOf('let providerVisibility='),script.indexOf('function headlineOf('));
+  vm.runInContext(providers,c);
+  assert.equal(c.providers().length,0);
+  vm.runInContext('providerVisibility={claude:false,codex:true,cursor:true,gemini:false}',c);
+  assert.deepEqual(Array.from(c.providers(),p=>p.id),['codex','cursor']);
 });
 test('CSP blocks objects, frames, inline handlers and external connections', () => {
   const csp = JSON.parse(fs.readFileSync(path.join(root,'tauri.conf.json'))).app.security.csp;
