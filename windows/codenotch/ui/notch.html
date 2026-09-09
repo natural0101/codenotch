@@ -51,8 +51,13 @@
   .c-head img.svg{width:16px;height:16px;object-fit:contain}
   .pct{font-size:15px;font-weight:600;color:#fff;font-variant-numeric:tabular-nums}
   .dim{opacity:.55}
-  /* Static activity marks avoid continuous repaints of the transparent desktop overlay.
-     Green arc = working; amber ring = waiting for input. */
+  /* Animate an independent HTML layer, not SVG geometry. Usage updates leave it intact. */
+  .activity-indicator{position:absolute;left:8px;top:8px;width:40px;height:40px;
+    border:2.5px solid transparent;border-radius:50%;pointer-events:none;display:none}
+  @keyframes activity-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  .activity-indicator[data-state="running"]{display:block;border-top-color:#28E07B;
+    will-change:transform;animation:activity-spin 3s linear infinite}
+  .activity-indicator[data-state="attention"]{display:block;border-color:#FFBF00}
 
   /* Hover card, shown to the left of the pill */
   #card{
@@ -175,7 +180,7 @@ function renderRing(){
   const want=ps.map(p=>p.id+':'+(glyphs[p.id]?glyphs[p.id].kind:'-')).join(',');
   if(pill.dataset.cells!==want){
     pill.innerHTML=ps.map(p=>`<div class="cell" data-p="${p.id}">
-      <div class="ringwrap"><svg class="ring" viewBox="0 0 56 56"></svg><div class="glyph ${(!glyphs[p.id]&&p.glyph.length>1)?'small':''}">${glyphHtml(p)}</div></div>
+      <div class="ringwrap"><svg class="ring" viewBox="0 0 56 56"></svg><div class="activity-indicator" data-state="idle" aria-hidden="true"></div><div class="glyph ${(!glyphs[p.id]&&p.glyph.length>1)?'small':''}">${glyphHtml(p)}</div></div>
       <div class="pct">—</div></div>`).join('');
     pill.dataset.cells=want;
   }
@@ -185,11 +190,8 @@ function renderRing(){
     const h=headlineOf(p.snap);
     let inner=`<circle cx="28" cy="28" r="22" fill="#2a2a2a"/><circle cx="28" cy="28" r="25" fill="none" stroke="${TRACK}" stroke-width="5"/>`;
     if(h && h.count==null) inner+=svgArc(25,Math.min(h.used,1),tone(h.used),5);
-    { // Static activity marks: green arc = working, amber ring = waiting on you.
-      const ws=workState(p.id);
-      if(ws==='running') inner+=svgArc(19,0.28,RUNGREEN,2.5);
-      else if(ws==='attention') inner+=`<circle cx="28" cy="28" r="19" fill="none" stroke="${AMBER}" stroke-width="2.5"/>`;
-    }
+    const indicator=cell.querySelector('.activity-indicator'), ws=workState(p.id);
+    if(indicator.dataset.state!==ws) indicator.dataset.state=ws;
     if(svg._ringMarkup!==inner){svg.innerHTML=inner;svg._ringMarkup=inner;}
     if(p.snap.status==='needsAuth'||p.snap.status==='none') pct.textContent='—';
     else if(h && h.count!=null) pct.textContent='~'+h.count;

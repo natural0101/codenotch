@@ -13,6 +13,34 @@ vm.runInContext(glyphFunction + '\n' + escapeFunction, context);
 const provider = {id:'codex',name:'Codex',glyph:'Cx'};
 
 test('complete UI JavaScript parses', () => { new vm.Script(script); });
+test('usage refreshes preserve the running indicator and do not reset its animation', () => {
+  let stateWrites = 0, ringWrites = 0, currentState = 'idle', workState = 'running';
+  const dataset = {get state(){return currentState;}, set state(v){stateWrites++;currentState=v;}};
+  const indicator = {dataset};
+  const ring = {set innerHTML(value){ringWrites++;}};
+  const classList = {toggle(){}};
+  const elements = {'svg.ring':ring,'.pct':{},'.glyph':{classList},'.ringwrap':{classList},'.activity-indicator':indicator};
+  const cell = {querySelector:selector=>elements[selector]};
+  const pill = {dataset:{cells:'codex:-'},querySelector:()=>cell,set innerHTML(value){throw new Error('Cell was recreated');}};
+  const snapshot = {status:'ok',windows:[{used:0.2}]};
+  const c = vm.createContext({pill,glyphs:{},providers:()=>[{id:'codex',snap:snapshot}],
+    headlineOf:s=>s.windows[0],workState:()=>workState,TRACK:'#333',tone:()=>'#fff',staleOf:()=>false});
+  const arc = script.slice(script.indexOf('function svgArc('),script.indexOf('function headline()'));
+  const render = script.slice(script.indexOf('function renderRing()'),script.indexOf('function resetCopy('));
+  vm.runInContext(arc+'\n'+render, c);
+  c.renderRing();
+  c.renderRing();
+  assert.equal(stateWrites,1);
+  assert.equal(ringWrites,1);
+  snapshot.windows[0].used=0.4;
+  c.renderRing();
+  assert.equal(ringWrites,2);
+  assert.equal(stateWrites,1);
+  workState='attention';
+  c.renderRing();
+  assert.equal(currentState,'attention');
+  assert.equal(stateWrites,2);
+});
 test('malicious SVG stays inside an image URL, never document markup', () => {
   for (const payload of ['<svg\nonload="alert(1)"></svg>', '<svg><script>alert(1)</script></svg>', '<svg><foreignObject><iframe src="https://example.com"/></foreignObject></svg>']) {
     const url = 'data:image/svg+xml;base64,' + Buffer.from(payload).toString('base64');
