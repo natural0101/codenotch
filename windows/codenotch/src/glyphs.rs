@@ -6,7 +6,7 @@
 //!      1.95.0 (MIT), files unmodified; trademark notice in glyphs/NOTICE.md;
 //!   3. The installed application's own icon (PrivateExtractIconsW on the exe resources, 64 px → PNG);
 //!   none of those → the page falls back to a letter.
-//! SVGs are inlined into the DOM as text (`fill="currentColor"` follows the CSS white/dimmed state);
+//! SVGs are base64 image URLs rendered exclusively through <img>, never inline document markup.
 //! PNGs and app icons go through <img>. Ids match the page and upstream: claude / codex / cursor / gemini.
 
 use serde::Serialize;
@@ -17,10 +17,8 @@ use std::path::{Path, PathBuf};
 pub struct Glyph {
     /// svg = inline SVG (monochrome, follows currentColor); png = bitmap artwork; appicon = application icon (colour, rounded and shrunk)
     pub kind: String,
-    /// data: URL for png/appicon
+    /// Image-only data: URL for svg/png/appicon; never decode into document markup.
     pub url: String,
-    /// The SVG text (script and on* event attributes removed)
-    pub svg: String,
     /// Where it came from (for doctor)
     pub source: String,
 }
@@ -35,48 +33,30 @@ const BUILTIN: [(&str, &str); 4] = [
     ("gemini", include_str!("../glyphs/gemini.svg")),
 ];
 
-/// Minimal SVG sanitising before inlining into the DOM: drop <script> blocks and on*="…" event
-/// attributes (the built-in files have none; this guards user files). Every slice position comes
-/// from an ASCII pattern match and lands on a character boundary, so non-ASCII content is safe.
-fn sanitize_svg(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let lower = s.to_ascii_lowercase();
-    let mut i = 0;
-    while let Some(rel) = lower[i..].find("<script") {
-        out.push_str(&s[i..i + rel]);
-        match lower[i + rel..].find("</script>") {
-            Some(e) => i = i + rel + e + "</script>".len(),
-            None => {
-                i = s.len();
-                break;
-            }
-        }
+/// SVG must only be rendered in an image context, where scripts and external resources
+/// are disabled. Encoding is transport, not sanitization; never inline decoded markup.
+fn svg_image_url(svg: &str) -> String {
+    // Images do not inherit the document color. Preserve the built-in monochrome marks.
+    let svg = svg.replace("currentColor", "#e8e8ea");
+    format!("data:image/svg+xml;base64,{}", b64(svg.as_bytes()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn svg_override_serializes_only_as_image_data() {
+        let path = std::env::temp_dir().join(format!("codenotch-svg-security-{}.svg", std::process::id()));
+        std::fs::write(&path, "<svg\nonload=\"alert(1)\"><script>alert(2)</script></svg>").unwrap();
+        let glyph = from_file(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        let value = serde_json::to_value(glyph).unwrap();
+        assert!(value.get("svg").is_none());
+        let url = value["url"].as_str().unwrap();
+        assert!(url.starts_with("data:image/svg+xml;base64,"));
+        assert!(!url.contains('<') && !url.contains('"'));
     }
-    out.push_str(&s[i..]);
-    let lo = out.to_ascii_lowercase();
-    let mut res = String::with_capacity(out.len());
-    let mut i = 0;
-    loop {
-        let Some(rel) = lo[i..].find(" on") else { break };
-        let start = i + rel;
-        let name_len = lo[start + 3..].bytes().take_while(|b| b.is_ascii_alphanumeric()).count();
-        let eq = start + 3 + name_len;
-        if name_len > 0 && lo.as_bytes().get(eq) == Some(&b'=') {
-            if let Some(&q) = lo.as_bytes().get(eq + 1) {
-                if q == b'"' || q == b'\'' {
-                    if let Some(close) = lo[eq + 2..].find(q as char) {
-                        res.push_str(&out[i..start]);
-                        i = eq + 2 + close + 1;
-                        continue;
-                    }
-                }
-            }
-        }
-        res.push_str(&out[i..start + 3]);
-        i = start + 3;
-    }
-    res.push_str(&out[i..]);
-    res
 }
 
 fn glyph_dirs() -> Vec<PathBuf> {
@@ -119,7 +99,7 @@ fn from_file(p: &Path) -> Option<Glyph> {
     match ext.as_str() {
         "svg" => Some(Glyph {
             kind: "svg".into(),
-            svg: sanitize_svg(&String::from_utf8_lossy(&bytes)),
+            url: svg_image_url(&String::from_utf8_lossy(&bytes)),
             source: p.display().to_string(),
             ..Default::default()
         }),
@@ -281,7 +261,7 @@ pub fn collect() -> HashMap<String, Glyph> {
             if let Some((_, svg)) = BUILTIN.iter().find(|(k, _)| *k == id) {
                 found = Some(Glyph {
                     kind: "svg".into(),
-                    svg: sanitize_svg(svg),
+                    url: svg_image_url(svg),
                     source: "built-in · @lobehub/icons-static-svg 1.95.0 (MIT)".into(),
                     ..Default::default()
                 });
