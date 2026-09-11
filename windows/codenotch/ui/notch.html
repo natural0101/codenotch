@@ -207,6 +207,7 @@ function renderRing(){
     glyph.classList.toggle('dim', !!(h && h.used>=1));
     wrap.classList.toggle('dim', staleOf(p.snap));
   }
+  updateHitRegions();
 }
 
 function resetCopy(ms){
@@ -285,6 +286,7 @@ function renderCard(){
   c.innerHTML=html;
   c.scrollTop=scroll;
   placeCard();
+  updateHitRegions();
 }
 // The card follows the hovered cell: vertically centred on it (kept inside the window), tail pointing at it
 function placeCard(){
@@ -310,7 +312,7 @@ card.addEventListener('click',e=>{
 });
 let hideTimer=null;
 function showCard(){clearTimeout(hideTimer);card.classList.add('show');renderCard();armWatchdog();} // show first, then render: placeCard needs offsetHeight
-function hideCard(){expandedProviders.clear();card.classList.remove('show');invoke('set_expanded',{on:false,rects:null}).catch(()=>{});}
+function hideCard(){expandedProviders.clear();card.classList.remove('show');updateHitRegions();invoke('set_expanded',{on:false,rects:null}).catch(()=>{});}
 function scheduleHide(){clearTimeout(hideTimer);hideTimer=setTimeout(hideCard,250);}
 // ===== Diagnostics + geometry =====
 function jslog(m){invoke('log_js',{msg:String(m)}).catch(()=>{});}
@@ -319,6 +321,23 @@ function callq(cmd,args){ // invoke with visible failure: any command error is r
 }
 // Hot rectangles are reported in physical pixels (multiplied by this page's real DPR), so the Rust side does no conversion — WebView2's DPR and the window scale can disagree
 function rectOf(el){const r=el.getBoundingClientRect(),k=window.devicePixelRatio||1;return [r.left*k,r.top*k,r.width*k,r.height*k];}
+let lastHitRegions='';
+function visibleHitRects(){
+  if(pill.style.display==='none')return [];
+  const p=rectOf(pill), k=window.devicePixelRatio||1, f=26*k;
+  // Include the two visible edge fillets, without widening the rest of the window.
+  const rects=[p,[p[0]+p[2]-f,p[1]-f,f,f],[p[0]+p[2]-f,p[1]+p[3],f,f]];
+  if(card.classList.contains('show'))rects.push(rectOf(card));
+  return rects;
+}
+function updateHitRegions(){
+  const rects=visibleHitRects(), key=JSON.stringify(rects);
+  if(key===lastHitRegions)return;
+  lastHitRegions=key;
+  invoke('set_hit_regions',{rects}).catch(e=>{lastHitRegions='';jslog('hit region failed: '+e);});
+}
+new ResizeObserver(()=>updateHitRegions()).observe(pill);
+new ResizeObserver(()=>updateHitRegions()).observe(card);
 function armWatchdog(){
   requestAnimationFrame(()=>{ // wait one frame so renderCard's new content is laid out before measuring
     if(!card.classList.contains('show'))return;
@@ -334,6 +353,7 @@ function fitZoom(){
 }
 function reportDpr(){
   const z=fitZoom();
+  updateHitRegions();
   jslog(`dpr=${window.devicePixelRatio} inner=${innerWidth}x${innerHeight} cssZoom=${z.toFixed(3)}`);
   callq('report_dpr',{dpr:window.devicePixelRatio||1,w:innerWidth,h:innerHeight}).catch(()=>{});
 }

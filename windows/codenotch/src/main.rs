@@ -17,6 +17,7 @@ mod glyphs;
 mod activity;
 mod diag;
 mod watcher;
+mod window_region;
 
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
@@ -24,7 +25,7 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Logical size of the notch window: the 70 pt pill column on the right plus room for the hover card on the left.
 pub const NOTCH_W: f64 = 340.0;
 /// Hand-bumped build tag, written to run.log at startup so a log can always be matched to the exe that wrote it.
-pub const BUILD: &str = "r32-compact-providers";
+pub const BUILD: &str = "r33-click-through";
 pub const NOTCH_H: f64 = 460.0; // 300 clipped the card once it held three window blocks plus the session list
 
 pub struct AppState {
@@ -614,6 +615,7 @@ fn main() {
             activity: Mutex::new(Vec::new()),
         })
         .invoke_handler(tauri::generate_handler![
+            window_region::set_hit_regions,
             get_provider_visibility,
             get_state,
             get_usage,
@@ -639,7 +641,9 @@ fn main() {
             place_notch(&handle);
             noactivate(&handle);
             if let Some(w) = handle.get_webview_window("notch") {
-                let _ = w.show();
+                if !handle.state::<AppState>().cfg.lock().unwrap().panel_hidden {
+                    let _ = w.show();
+                }
             }
             tray::setup(&handle)?;
             server::start(handle.clone(), port);

@@ -24,6 +24,8 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
 
 pub fn build_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<Wry>> {
     let cfg = app.state::<crate::AppState>().cfg.lock().unwrap().clone();
+    let visibility = MenuItemBuilder::with_id("panel-visible",
+        if cfg.panel_hidden { "Показать панель" } else { "Скрыть панель" }).build(app)?;
     let mut services = SubmenuBuilder::new(app, "Сервисы");
     for (id, label) in [("claude", "Claude"), ("codex", "Codex"), ("cursor", "Cursor"), ("gemini", "Antigravity")] {
         let mut service = SubmenuBuilder::new(app, label);
@@ -65,6 +67,7 @@ pub fn build_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<Wry>> {
         .build(app)?;
     let quit = MenuItemBuilder::with_id("quit", tr(lang, "quit")).build(app)?;
     MenuBuilder::new(app)
+        .item(&visibility)
         .item(&services)
         .separator()
         .items(&[&install, &uninstall])
@@ -118,6 +121,21 @@ fn handle(app: &AppHandle, id: &str) {
         return;
     }
     match id {
+        "panel-visible" => {
+            let st=app.state::<crate::AppState>();
+            let hidden={
+                let mut cfg=st.cfg.lock().unwrap();
+                cfg.panel_hidden=!cfg.panel_hidden;
+                crate::config::save(&cfg);
+                cfg.panel_hidden
+            };
+            let _=app.emit("pointer_left", ());
+            if let Some(w)=app.get_webview_window("notch") {
+                let result=if hidden { w.hide() } else { w.show() };
+                if let Err(e)=result { notice(app,Err(e.to_string())); }
+            }
+            refresh_menu(app);
+        }
         "install" => notice(app, hooks_install::install()),
         "uninstall" => notice(app, hooks_install::uninstall()),
         "reset" => crate::reset_bar(app),

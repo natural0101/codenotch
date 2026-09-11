@@ -13,6 +13,23 @@ vm.runInContext(glyphFunction + '\n' + escapeFunction, context);
 const provider = {id:'codex',name:'Codex',glyph:'Cx'};
 
 test('complete UI JavaScript parses', () => { new vm.Script(script); });
+test('native hit regions follow panel, card visibility, and DPI without a full-window rectangle', () => {
+  let expanded=false;
+  const pill={style:{},rect:[540,140,140,640]};
+  const card={rect:[20,180,492,420],classList:{contains:()=>expanded}};
+  const c=vm.createContext({pill,card,window:{devicePixelRatio:2},rectOf:el=>el.rect});
+  const fn=script.slice(script.indexOf('function visibleHitRects()'),script.indexOf('function updateHitRegions()'));
+  vm.runInContext(fn,c);
+  assert.equal(c.visibleHitRects().length,3);
+  assert.ok(c.visibleHitRects().every(r=>r[0]>=540));
+  expanded=true;
+  assert.equal(c.visibleHitRects().length,4);
+  assert.equal(c.visibleHitRects()[3],card.rect);
+  expanded=false;
+  assert.equal(c.visibleHitRects().length,3);
+  pill.style.display='none';
+  assert.equal(c.visibleHitRects().length,0);
+});
 test('usage refreshes preserve the running indicator and do not reset its animation', () => {
   let stateWrites = 0, ringWrites = 0, currentState = 'idle', workState = 'running';
   const dataset = {get state(){return currentState;}, set state(v){stateWrites++;currentState=v;}};
@@ -23,7 +40,7 @@ test('usage refreshes preserve the running indicator and do not reset its animat
   const cell = {querySelector:selector=>elements[selector]};
   const pill = {style:{},dataset:{cells:'codex:-'},querySelector:()=>cell,set innerHTML(value){throw new Error('Cell was recreated');}};
   const snapshot = {status:'ok',windows:[{used:0.2}]};
-  const c = vm.createContext({pill,glyphs:{},providers:()=>[{id:'codex',snap:snapshot}],
+  const c = vm.createContext({pill,glyphs:{},updateHitRegions:()=>{},providers:()=>[{id:'codex',snap:snapshot}],
     headlineOf:s=>s.windows[0],workState:()=>workState,TRACK:'#333',tone:()=>'#fff',staleOf:()=>false});
   const arc = script.slice(script.indexOf('function svgArc('),script.indexOf('function headline()'));
   const render = script.slice(script.indexOf('function renderRing()'),script.indexOf('function resetCopy('));
@@ -69,7 +86,7 @@ test('text and attribute delimiters are escaped', () => {
 });
 test('usage card escapes provider notes and labels', () => {
   const card = {innerHTML:''};
-  const c = vm.createContext({document:{getElementById:()=>card}, hoverId:'codex', stateSnap:{sessions:[]}, activity:[], placeCard:()=>{}, glyphHtml:()=>'', staleOf:()=>false, tone:()=>'', resetCopy:()=>'',
+  const c = vm.createContext({document:{getElementById:()=>card}, hoverId:'codex', stateSnap:{sessions:[]}, activity:[], placeCard:()=>{},updateHitRegions:()=>{}, glyphHtml:()=>'', staleOf:()=>false, tone:()=>'', resetCopy:()=>'',
     providers:()=>[{id:'codex',name:'Codex',snap:{status:'ok',windows:[{label:'<img onerror="alert(1)">',used:0.5}],note:'<svg onload="alert(1)">',fetched_at:0}}]});
   const fn = script.slice(script.indexOf('function renderCard()'),script.indexOf('// The card follows'));
   const tasks=script.slice(script.indexOf('const expandedProviders='),script.indexOf('function renderCard()'));

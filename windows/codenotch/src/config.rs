@@ -23,6 +23,8 @@ pub struct Config {
     pub notch_y: f64,
     #[serde(default)]
     pub providers: std::collections::BTreeMap<String, ProviderMode>,
+    #[serde(default)]
+    pub panel_hidden: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
@@ -101,6 +103,7 @@ impl Default for Config {
             drag_enabled: false,
             notch_y: default_notch_y(),
             providers: Default::default(),
+            panel_hidden: false,
         }
     }
 }
