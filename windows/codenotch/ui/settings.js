@@ -30,6 +30,17 @@ function esc(s){
     { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
   ));
 }
+let settingsGlyphs={},settingsVisibility={};
+function settingsGlyph(id){
+  const g=settingsGlyphs[id],url=g&&g.url;
+  return typeof url==='string'&&/^data:image\/(?:svg\+xml|png);base64,[A-Za-z0-9+/]+=*$/.test(url)
+    ? '<img src="'+url+'" alt="" class="settings-provider-image">'
+    : '<span>'+esc((FALLBACK_LABEL[id]||id).slice(0,1))+'</span>';
+}
+function decorateNavigation(){
+  const paths={tray:'M4 5h16v11H4zM8 20h8M12 16v4',notch:'M5 4h14v16H5zM15 8h4v8h-4z',modules:'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',behaviour:'M4 7h16M4 17h16M8 4v6M16 14v6',hooks:'m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16',about:'M12 16v-5m0-4v1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0'};
+  for(const [id,path] of Object.entries(paths)){const b=document.getElementById('tab-'+id);if(!b)continue;const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.6');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');const p=document.createElementNS(svg.namespaceURI,'path');p.setAttribute('d',path);svg.append(p);b.prepend(svg);}
+}
 
 /* The three usage bands, byte-for-byte the ones trayicon.rs paints, so a dot in the picker is the
    same colour as the pixels in the preview. They are the only saturated colours in this window. */
@@ -39,8 +50,37 @@ function band(p){ return p < 50 ? '#4ade80' : p < 80 ? '#facc15' : '#f87171'; }
 const ORDER = ['claude', 'codex', 'cursor', 'gemini'];
 const FALLBACK_LABEL = { claude:'Claude', codex:'Codex', cursor:'Cursor', gemini:'Antigravity' };
 const RU_STATIC = {
+  'Preview':'Предпросмотр', 'At the edge of your screen':'У правого края экрана', 'tools enabled':'инструмента на панели',
+  'Ready':'Доступен',
+  "Show usage beside the clock. Choose a layout, then select what each part displays.":"Лимиты рядом с часами. Выберите вид значка и показания для каждой его части.",
+  "Numbers, bars, or the Codenotch icon.":"Числа, полосы или значок Codenotch.",
+  "Preview at Windows display sizes.":"Предпросмотр при разных масштабах Windows.",
+  "Choose a layout that stays readable at this size.":"Выберите вид, который хорошо читается в этом размере.",
+  "Select a tool for each part of the icon.":"Выберите инструмент для каждой части значка.",
+  "Startup, visibility, and language.":"Запуск, видимость и язык.",
+  "Open Codenotch when you sign in to Windows.":"Открывать Codenotch при входе в Windows.",
+  "Keep the panel or tray icon visible to reach Codenotch.":"Панель или значок в трее остаётся видимым для доступа к Codenotch.",
+  "Show usage at the edge of the screen.":"Показывать лимиты у края экрана.",
+  "Right-click for settings, refresh, and quit.":"Правый клик: настройки, обновление и выход.",
+  "Turn the panel on before hiding the tray icon.":"Включите панель, чтобы скрыть значок в трее.",
+  "“Follow system” uses your Windows language.":"«Как в системе» использует язык Windows.",
+  "Live session activity from Claude Code.":"Текущая активность сеансов Claude Code.",
+  "Add hooks to Claude Code settings for session start, work, waiting, and completion.":"Добавить хуки в настройки Claude Code для начала работы, ожидания ответа и завершения сеанса.",
+  "Version, local data, and panel position.":"Версия, локальные данные и положение панели.",
+  "Usage and local tools, always within reach.":"Лимиты и локальные инструменты под рукой.",
+  "Settings, tasks, logs, and custom icons.":"Настройки, дела, журнал и собственные значки.",
+  "Return the panel to the middle of the screen edge.":"Вернуть панель в середину края экрана.",
+  'Settings':'Настройки', 'Sections':'Разделы', 'Tools':'Инструменты',
+  'Your tools, one glance away.':'Нужные инструменты — у края экрана.',
+  'Choose the rings shown at the edge of your screen.':'Выберите, какие инструменты показывать на панели.',
+  'Adjust the size to suit your screen.':'Подберите удобный масштаб.',
+  'Keep only what you use.':'Оставьте только то, чем пользуетесь.',
+  'Your workspace':'Рабочее пространство', 'Optional tabs in the account panel.':'Дополнительные вкладки панели аккаунтов.',
+  'Account details':'Детали аккаунта',
+  'The account name and remaining allowance are always shown.':'Имя аккаунта и остаток лимита видны всегда.',
+  'Model data':'Модели', 'Provider options':'Параметры Antigravity',
   'Codex account panel':'Панель аккаунтов Codex',
-  'Tasks section':'Раздел «Дела»', 'Services section':'Раздел «Сервисы»', 'Knowledge section':'Раздел «Память»',
+  'Tasks section':'Дела', 'Services section':'Сервисы', 'Knowledge section':'Память',
   'By default, only the account and remaining allowance are shown.':'По умолчанию — только аккаунт и остаток лимита.',
   'Header':'Заголовок', 'Plan':'Тариф', 'Reset time':'Время сброса',
   'Updated time':'Время обновления', 'Other limits':'Другие лимиты',
@@ -51,7 +91,7 @@ const RU_STATIC = {
   'Codex accounts':'Аккаунты Codex',
   'View limits across your local Codex profiles.':'Лимиты ваших локальных профилей Codex.',
   'Open accounts':'Открыть аккаунты',
-  'Settings sections':'Разделы настроек', 'Appearance':'Внешний вид', 'Taskbar icon':'Значок в панели задач',
+  'Settings sections':'Разделы настроек', 'Appearance':'Внешний вид', 'Taskbar icon':'Значок в трее',
   'Notch':'Панель', 'General':'Общие', 'Behaviour':'Поведение', 'Claude Code':'Claude Code', 'About':'О программе',
   'The small icon down by the clock. Codenotch draws your usage straight into it — 32 pixels square. Pick a layout, then click a part of the picture to choose what that part shows.':'Небольшой значок рядом с часами. Codenotch показывает в нём использование — 32 пикселя. Выберите макет и нажмите на часть изображения, чтобы настроить её.',
   'Layout':'Макет', 'What gets drawn into those 32 pixels.':'Что отображается в этих 32 пикселях.',
@@ -175,7 +215,7 @@ function toast(msg){
    One pane visible at a time. The chosen tab is remembered in localStorage, so reopening the
    window comes back to where the user was. localStorage can throw in a locked-down WebView, so
    both the read and the write are wrapped. */
-const TABS = ['tray', 'notch', 'behaviour', 'hooks', 'about'];
+const TABS = ['tray', 'notch', 'modules', 'behaviour', 'hooks', 'about'];
 const TAB_KEY = 'codenotch.settings.tab';
 let curTab = TABS[0];
 
@@ -368,6 +408,7 @@ function refreshPreview(){
   });
 }
 function setTruth(url){
+  if(!url&&cfg.mode==='off')url=document.querySelector('.ph-mark img')?.src||'tray.png';
   for(const im of document.querySelectorAll('.truthcell img')){
     if(url){ im.src = url; im.classList.remove('hide'); }
     else { im.classList.add('hide'); }
@@ -586,21 +627,26 @@ function renderNotch(){
     html += '<div class="np-row">'
       + '<button class="p-item' + (ticked ? ' on' : '') + (only ? ' lock' : '') + '"'
       + ' data-np="' + esc(p.id) + '" role="checkbox" aria-checked="' + ticked + '">'
-      + '<span class="p-tick">' + (ticked ? '&#10003;' : '') + '</span>'
-      + '<span class="p-label">' + esc(p.label || p.id) + '</span>'
-      + '<span class="np-right">'
-      + (st ? '<span class="p-status warn">' + esc(st) + '</span>' : '')
-      + (only ? '<span class="np-lock">kept</span>' : '')
-      + '</span></button>';
+      + '<span class="provider-mark" data-provider="' + esc(p.id) + '" aria-hidden="true">' + settingsGlyph(p.id) + '</span>'
+      + '<span class="provider-copy"><span class="p-label">' + esc(p.label || p.id) + '</span>'
+      + '<span class="p-status">' + esc(st || ui('Ready','Ready')) + '</span></span>'
+      + '<span class="provider-switch" aria-hidden="true"></span></button>';
     if(p.id === 'gemini'){
-      html += agPicker('limit', ui('Notch reads', 'Notch reads'), AG_LIMITS, agPrefs.limit, ticked)
-        + agPicker('model', ui('Model data', 'Model data'), AG_MODELS, agPrefs.model, ticked);
+      html += '<details class="provider-options"><summary>' + esc(ui('Provider options','Provider options')) + '</summary>'
+        + agPicker('limit', ui('Notch reads', 'Notch reads'), AG_LIMITS, agPrefs.limit, ticked)
+        + agPicker('model', ui('Model data', 'Model data'), AG_MODELS, agPrefs.model, ticked) + '</details>';
     }
     html += '</div>';
   }
   host.innerHTML = html;
-  note.textContent = ui('Showing', 'Showing') + ' ' + on.map(sl => provLabel(sl.provider)).join(', ')
-    + '. ' + ui('One provider always stays ticked, so the pill is never empty.', 'One provider always stays ticked, so the pill is never empty.');
+  note.textContent = '';
+  renderNotchPreview();
+}
+function renderNotchPreview(){
+  const host=document.getElementById('notch-live-preview');if(!host)return;
+  const on=notchOn().filter(p=>settingsVisibility[p.provider]!==false);host.innerHTML=on.map(p=>'<span class="preview-provider">'+settingsGlyph(p.provider)+'</span>').join('');
+  host.style.transform='scale('+(scalePct/100)+')';
+  document.getElementById('notch-preview-count').textContent=on.length+' '+ui('tools enabled','tools enabled');
 }
 
 /* Everything ticked is stored as an EMPTY list, not as four slots. Empty means "all" to the Rust
@@ -711,6 +757,7 @@ function clampPct(v){
   const lab = document.getElementById('scale-val');
   r.addEventListener('input', () => {
     scalePct = clampPct(r.value);
+    renderNotchPreview();
     lab.textContent = scalePct + '%';
     clearTimeout(scaleTimer);        // one save when the drag settles, not one per pixel
     scaleTimer = setTimeout(() => {
@@ -868,6 +915,9 @@ document.getElementById('btn-resetpos').addEventListener('click', () => {
 
 /* ---- start ------------------------------------------------------------- */
 function boot(){
+  decorateNavigation();
+  invoke('get_glyphs').then(g=>{settingsGlyphs=g||{};renderNotch();}).catch(()=>{});
+  invoke('get_provider_visibility').then(v=>{settingsVisibility=v||{};renderNotchPreview();}).catch(()=>{});
   startDrawerPreferences();
   setUiLanguage('auto');
   showTab(savedTab());

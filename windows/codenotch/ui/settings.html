@@ -253,15 +253,19 @@
   }
   #toast.show{opacity:1}
 </style>
+<link rel="stylesheet" href="settings-fonts.css">
+<link rel="stylesheet" href="settings-theme.css">
 </head>
 <body>
 <div id="shell">
 
   <!-- ---- the tab list ------------------------------------------------------------------ -->
   <nav id="side" role="tablist" aria-orientation="vertical" aria-label="Settings sections">
+    <div class="settings-brand"><svg class="brand-symbol" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="10" fill="currentColor"/><path d="M22 10a8 8 0 1 0 0 12" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"/><path d="M21 15h4v2h-4z" fill="white"/></svg><span>Codenotch<small>Settings</small></span></div>
     <div class="s-group first">Appearance</div>
     <button class="tab" id="tab-tray" role="tab" aria-controls="pane-tray" aria-selected="false" tabindex="-1">Taskbar icon</button>
     <button class="tab" id="tab-notch" role="tab" aria-controls="pane-notch" aria-selected="false" tabindex="-1">Notch</button>
+    <button class="tab" id="tab-modules" role="tab" aria-controls="pane-modules" aria-selected="false" tabindex="-1">Sections</button>
     <div class="s-group">General</div>
     <button class="tab" id="tab-behaviour" role="tab" aria-controls="pane-behaviour" aria-selected="false" tabindex="-1">Behaviour</button>
     <button class="tab" id="tab-hooks" role="tab" aria-controls="pane-hooks" aria-selected="false" tabindex="-1">Claude Code</button>
@@ -275,11 +279,11 @@
     <!-- APPEARANCE / Taskbar icon ------------------------------------------------------- -->
     <section class="pane" id="pane-tray" role="tabpanel" aria-labelledby="tab-tray" tabindex="0" hidden>
       <h1 class="p-title">Taskbar icon</h1>
-      <p class="p-lede">The small icon down by the clock. Codenotch draws your usage straight into it — 32 pixels square. Pick a layout, then click a part of the picture to choose what that part shows.</p>
+      <p class="p-lede">Show usage beside the clock. Choose a layout, then select what each part displays.</p>
 
       <div class="block first">
         <div class="b-head">Layout</div>
-        <div class="b-sub">What gets drawn into those 32 pixels.</div>
+        <div class="b-sub">Numbers, bars, or the Codenotch icon.</div>
         <div class="modes" id="modes"></div>
 
         <div class="previewrow">
@@ -293,9 +297,9 @@
           </div>
           <div class="truth">
             <div class="c-title" style="font-size:12px">Actual size</div>
-            <div class="c-sub">This is how big it really is in the taskbar.</div>
+            <div class="c-sub">Preview at Windows display sizes.</div>
             <div class="truthstrip" id="truthstrip"></div>
-            <div class="c-note dim" style="margin-top:6px">Windows picks one of these depending on the display. If a number is unreadable here, it will be unreadable in the taskbar.</div>
+            <div class="c-note dim" style="margin-top:6px">Choose a layout that stays readable at this size.</div>
           </div>
         </div>
 
@@ -304,7 +308,7 @@
 
       <div class="block">
         <div class="b-head">What each part shows</div>
-        <div class="b-sub">Pick the tool; each part draws that tool's ring.</div>
+        <div class="b-sub">Select a tool for each part of the icon.</div>
         <div class="picker" id="picker"></div>
       </div>
     </section>
@@ -312,31 +316,37 @@
     <!-- APPEARANCE / Notch ---------------------------------------------------------------- -->
     <section class="pane" id="pane-notch" role="tabpanel" aria-labelledby="tab-notch" tabindex="0" hidden>
       <h1 class="p-title">Notch</h1>
-      <p class="p-lede">The small black pill that floats against the right-hand edge of the screen. Each tool you tick gets one ring on it.</p>
-
+      <p class="p-lede">Your tools, one glance away.</p>
+      <div class="notch-stage">
+        <div class="stage-scene">
+          <div class="stage-caption"><span>Preview</span><strong>At the edge of your screen</strong><small id="notch-preview-count"></small></div>
+          <div class="stage-edge"><div id="notch-live-preview" aria-hidden="true"></div></div>
+        </div>
+        <div class="stage-controls"><label class="stage-label" for="scale-range">Size</label><div class="c-scale"><input id="scale-range" type="range" min="40" max="100" step="5" value="100" aria-label="Notch size"><span class="c-scale-val" id="scale-val">100%</span></div></div>
+      </div>
       <div class="block first">
-        <div class="b-head">What appears on the pill</div>
-        <div class="b-sub">Click a name to switch its ring on or off.</div>
+        <div class="b-head">Tools</div>
+        <div class="b-sub">Choose the rings shown at the edge of your screen.</div>
         <div class="np-list" id="notch-list"></div>
         <div class="c-note dim" id="notch-note" style="margin-top:6px"></div>
       </div>
 
-      <div class="block">
-        <div class="b-head">Size</div>
-        <div class="b-sub">How big the pill is drawn. The same slider sits at the foot of the pill's hover card, so it can be changed from either place.</div>
-        <div class="c-scale">
-          <input id="scale-range" type="range" min="40" max="100" step="5" value="100" aria-label="Notch size">
-          <span class="c-scale-val" id="scale-val">100%</span>
-        </div>
-      </div>
-
+    </section>
+    <section class="pane" id="pane-modules" role="tabpanel" aria-labelledby="tab-modules" tabindex="0" hidden>
+      <h1 class="p-title">Sections</h1>
+      <p class="p-lede">Keep only what you use.</p>
       <fieldset class="drawer-prefs" id="drawer-preferences" aria-describedby="drawer-preferences-note">
-        <legend class="b-head">Codex account panel</legend>
-        <div class="b-sub" id="drawer-preferences-note">By default, only the account and remaining allowance are shown.</div>
+        <legend class="b-head">Your workspace</legend>
+        <div class="b-sub" id="drawer-preferences-note">Optional tabs in the account panel.</div>
         <div class="drawer-options">
           <label class="drawer-option"><input type="checkbox" data-drawer-pref="showTodos" disabled><span>Tasks section</span></label>
           <label class="drawer-option"><input type="checkbox" data-drawer-pref="showServices" disabled><span>Services section</span></label>
           <label class="drawer-option"><input type="checkbox" data-drawer-pref="showMemory" disabled><span>Knowledge section</span></label>
+        </div>
+        <details class="drawer-details">
+          <summary>Account details</summary>
+          <div class="b-sub">The account name and remaining allowance are always shown.</div>
+          <div class="drawer-options">
           <label class="drawer-option"><input type="checkbox" data-drawer-pref="showHeader" disabled><span>Header</span></label>
           <label class="drawer-option"><input type="checkbox" data-drawer-pref="showPlan" disabled><span>Plan</span></label>
           <label class="drawer-option"><input type="checkbox" data-drawer-pref="showReset" disabled><span>Reset time</span></label>
@@ -344,25 +354,22 @@
           <label class="drawer-option"><input type="checkbox" data-drawer-pref="showExtras" disabled><span>Other limits</span></label>
           <label class="drawer-option"><input type="checkbox" data-drawer-pref="showActions" disabled><span>Action buttons</span></label>
           <label class="drawer-option"><input type="checkbox" data-drawer-pref="showActive" disabled><span>Highlight default account</span></label>
-        </div>
+          </div>
+        </details>
       </fieldset>
-
-      <div class="block">
-        <div class="c-note dim">Whether the pill is on screen at all is a separate switch, under General &rarr; Behaviour.</div>
-      </div>
     </section>
 
     <!-- GENERAL / Behaviour ---------------------------------------------------------------- -->
     <section class="pane" id="pane-behaviour" role="tabpanel" aria-labelledby="tab-behaviour" tabindex="0" hidden>
       <h1 class="p-title">Behaviour</h1>
-      <p class="p-lede">When Codenotch runs, and what it puts on your screen.</p>
+      <p class="p-lede">Startup, visibility, and language.</p>
 
       <div class="block first">
         <div class="b-head">Starting up</div>
         <div class="row">
           <div class="r-text">
             <div class="r-name">Start with Windows</div>
-            <div class="r-why">Codenotch opens by itself every time you sign in to this computer, and waits quietly in the background until a coding session starts. Turn it off and you have to open Codenotch yourself.</div>
+            <div class="r-why">Open Codenotch when you sign in to Windows.</div>
           </div>
           <div class="r-ctl"><button class="sw" id="sw-autostart" role="switch" aria-checked="false" aria-label="Start with Windows"><span class="knob"></span></button></div>
         </div>
@@ -370,19 +377,19 @@
 
       <div class="block">
         <div class="b-head">What is on screen</div>
-        <div class="b-sub">One of these two always stays on. If you hide the notch, the taskbar icon is held on for you, because with both of them gone there would be nothing left to click and no way back to this window.</div>
+        <div class="b-sub">Keep the panel or tray icon visible to reach Codenotch.</div>
         <div class="row">
           <div class="r-text">
             <div class="r-name">Show the notch</div>
-            <div class="r-why">The black pill against the right-hand edge of the screen, with one ring per tool. Turn it off and the pill disappears; Codenotch keeps counting your usage either way.</div>
+            <div class="r-why">Show usage at the edge of the screen.</div>
           </div>
           <div class="r-ctl"><button class="sw" id="sw-notch" role="switch" aria-checked="true" aria-label="Show the notch"><span class="knob"></span></button></div>
         </div>
         <div class="row">
           <div class="r-text">
             <div class="r-name">Show the taskbar icon</div>
-            <div class="r-why">The small icon down by the clock. Right-clicking it opens this window, refreshes the readings, or quits Codenotch.</div>
-            <div class="c-note dim" id="tray-lock" style="margin-top:6px" hidden>Held on: the notch is hidden, so this icon is the only way left to reach Codenotch. Switch the notch back on first if you want to hide it.</div>
+            <div class="r-why">Right-click for settings, refresh, and quit.</div>
+            <div class="c-note dim" id="tray-lock" style="margin-top:6px" hidden>Turn the panel on before hiding the tray icon.</div>
           </div>
           <div class="r-ctl"><button class="sw" id="sw-tray" role="switch" aria-checked="true" aria-label="Show the taskbar icon"><span class="knob"></span></button></div>
         </div>
@@ -395,7 +402,7 @@
         <div class="row">
           <div class="r-text">
             <div class="r-name">Words used by Codenotch</div>
-            <div class="r-why">Sets the language used by Codenotch. “Follow system” uses the language Windows itself is set to.</div>
+            <div class="r-why">“Follow system” uses your Windows language.</div>
           </div>
           <div class="r-ctl">
             <select id="lang" aria-label="Language">
@@ -414,14 +421,14 @@
     <!-- GENERAL / Claude Code -------------------------------------------------------------- -->
     <section class="pane" id="pane-hooks" role="tabpanel" aria-labelledby="tab-hooks" tabindex="0" hidden>
       <h1 class="p-title">Claude Code</h1>
-      <p class="p-lede">Claude Code can tell Codenotch the moment something happens in a session, instead of Codenotch having to guess from files on disk.</p>
+      <p class="p-lede">Live session activity from Claude Code.</p>
 
       <div class="block first">
         <div class="b-head">Session messages</div>
         <div class="row">
           <div class="r-text">
             <div class="r-name">Let Claude Code notify Codenotch</div>
-            <div class="r-why">Turning this on adds a few lines to your Claude Code settings file so that Claude Code sends Codenotch a short message when a session starts, when it is working, when it is waiting for your answer, and when it finishes. That is what makes the ring spin and the amber ring pulse.</div>
+            <div class="r-why">Add hooks to Claude Code settings for session start, work, waiting, and completion.</div>
           </div>
           <div class="r-ctl"><button class="sw" id="sw-hooks" role="switch" aria-checked="false" aria-label="Let Claude Code notify Codenotch"><span class="knob"></span></button></div>
         </div>
@@ -434,17 +441,17 @@
     <!-- GENERAL / About ---------------------------------------------------------------------- -->
     <section class="pane" id="pane-about" role="tabpanel" aria-labelledby="tab-about" tabindex="0" hidden>
       <h1 class="p-title">About</h1>
-      <p class="p-lede">What this copy of Codenotch is, and where it keeps its files.</p>
+      <p class="p-lede">Version, local data, and panel position.</p>
 
       <div class="block first">
         <div class="about-top">
           <img class="about-mark" data-logo src="tray.png" alt="Codenotch">
           <div>
             <div class="about-name">Codenotch</div>
-            <div class="about-ver">Version <span id="about-version">0.3.0</span></div>
+            <div class="about-ver">Version <span id="about-version">0.5.1</span></div>
           </div>
         </div>
-        <div class="c-note dim" style="margin-top:10px">Shows how much of your Claude, Codex, Cursor and Antigravity allowance you have used, in the taskbar icon and in a pill at the edge of the screen.</div>
+        <div class="c-note dim" style="margin-top:10px">Usage and local tools, always within reach.</div>
       </div>
 
       <div class="block">
@@ -452,7 +459,7 @@
         <div class="row">
           <div class="r-text">
             <div class="r-name">Data folder</div>
-            <div class="r-why">Everything Codenotch remembers lives in one folder: your settings, its log file, and the "glyphs" folder where you can drop your own icons. Opens in File Explorer.</div>
+            <div class="r-why">Settings, tasks, logs, and custom icons.</div>
             <div class="path">%APPDATA%\codenotch</div>
           </div>
           <div class="r-ctl"><button class="btn" id="btn-data">Open folder</button></div>
@@ -464,7 +471,7 @@
         <div class="row">
           <div class="r-text">
             <div class="r-name">Put the notch back</div>
-            <div class="r-why">The pill can be dragged up and down the right-hand edge. If it has ended up somewhere you cannot see it — off the bottom of a screen you have unplugged, say — this drops it back into the middle of the edge.</div>
+            <div class="r-why">Return the panel to the middle of the screen edge.</div>
           </div>
           <div class="r-ctl"><button class="btn" id="btn-resetpos">Reset position</button></div>
         </div>
