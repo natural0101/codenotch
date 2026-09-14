@@ -1,8 +1,8 @@
 (function(root){
  'use strict';const M=root.AccountsModel;
- const icons={sort:'M5 3v10m-3-3 3 3 3-3M11 13V3m-3 3 3-3 3 3',settings:'M6 2h4l.5 2 2 .8 1.5 3.2-1.5 3.2-2 .8-.5 2H6l-.5-2-2-.8L2 8l1.5-3.2 2-.8Z M10 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0',refresh:'M13 6a5 5 0 0 0-8-2L2 6m0-4v4h4M3 10a5 5 0 0 0 8 2l3-2m0 4v-4h-4',clock:'M14 8a6 6 0 1 1-12 0 6 6 0 0 1 12 0M8 4v4l3 2'};
+ const icons={sort:'M8 4v16m-4-4 4 4 4-4M16 20V4m-4 4 4-4 4 4',settings:'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.73v.52a2 2 0 0 1-1 1.73l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.73v-.52a2 2 0 0 1 1-1.73l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',refresh:'M3 12a9 9 0 0 1 15.35-6.35L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.35 6.35L3 16m0 5v-5h5',clock:'M20.75 12a8.75 8.75 0 1 1-17.5 0 8.75 8.75 0 0 1 17.5 0M12 7v5l3.25 2',chevron:'m6 9 6 6 6-6'};
  function node(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=String(text);return n;}
- function icon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 16 16');svg.setAttribute('aria-hidden','true');const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',icons[name]);svg.append(p);return svg;}
+ function icon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('focusable','false');svg.setAttribute('aria-hidden','true');const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',icons[name]);svg.append(p);return svg;}
  function button(name,title,action){const n=node('button','cd-icon');n.type='button';n.title=title;n.setAttribute('aria-label',title);n.append(icon(name));n.addEventListener('click',action);return n;}
  function weekly(a){return M.windows(a).find(w=>!w.group&&w.count==null&&/weekly|week|7d/i.test(w.id+' '+w.label)&&!/spark|review/i.test(w.id+' '+w.label))||null;}
  function ordered(accounts,sort,now){const projected=accounts.map(a=>({...a,snapshot:{...a.snapshot,windows:weekly(a)?[weekly(a)]:[]}}));return M.sorted(projected,sort,now).map(p=>accounts.find(a=>a.id===p.id));}
@@ -34,7 +34,7 @@
    if(prefs.showPlan&&knownPlan){const plan=node('span','cd-plan',String(knownPlan).toUpperCase());plan.title=t('Plan','Тариф');line.append(plan);}
    line.append(bar,value);
    const extras=M.windows(a).filter(x=>x!==w);
-   if(prefs.showExtras&&extras.length){const disclosure=node('button','cd-expand',o.expanded.has(a.id)?'⌃':'⌄');disclosure.type='button';disclosure.title=t('Other limits','Другие лимиты');disclosure.setAttribute('aria-label',disclosure.title);disclosure.setAttribute('aria-expanded',String(o.expanded.has(a.id)));disclosure.addEventListener('click',()=>o.expand(a.id));line.append(disclosure);}
+   if(prefs.showExtras&&extras.length){const disclosure=node('button','cd-expand');disclosure.append(icon('chevron'));disclosure.type='button';disclosure.title=t('Other limits','Другие лимиты');disclosure.setAttribute('aria-label',disclosure.title);disclosure.setAttribute('aria-expanded',String(o.expanded.has(a.id)));disclosure.addEventListener('click',()=>o.expand(a.id));line.append(disclosure);}
    row.append(line);
    if(prefs.showReset){
     const meta=node('div','cd-meta');meta.append(icon('clock'));let reset='—';

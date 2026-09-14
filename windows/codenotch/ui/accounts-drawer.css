@@ -5,3 +5,7 @@
 #drawer-collapse{display:none;position:absolute;right:4px;width:20px;height:44px;padding:0;border-radius:12px;border:1px solid #ffffff38;background:#292929;color:#aaa;font-size:20px;cursor:pointer}
 .drawer-open.drawer-actions #drawer-collapse{display:block}.drawer-open #pill{visibility:hidden;pointer-events:none}.drawer-open #tail{display:none!important}
 #drawer-collapse:hover{background:#454545;color:#fff}#drawer-collapse:focus-visible{outline:1px solid #ccc}
+
+/* The optional controls share the rounded TeamON 24px symbol construction. */
+.cd-icon svg{width:19px;height:19px;stroke-width:1.8;color:#dadfdc}.cd-icon:hover svg{color:#fff}.cd-meta svg{width:14px;height:14px;stroke-width:1.7}.cd-expand{display:flex;align-items:center;justify-content:center;min-height:20px}.cd-expand svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s ease}.cd-expand[aria-expanded=true] svg{transform:rotate(180deg)}
+@media(prefers-reduced-motion:reduce){.cd-expand svg{transition:none}}

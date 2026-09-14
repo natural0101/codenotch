@@ -86,7 +86,7 @@ test('provider rows escape server labels, status text and attribute values', () 
   const id = 'codex" data-injected="yes';
   const c = contextFor(['esc', 'settingsGlyph', 'renderNotchPreview', 'renderNotch'], {
     document: { getElementById: key => ({ 'notch-list': host, 'notch-note': note })[key] },
-    settingsGlyphs: {}, FALLBACK_LABEL: {},
+    settingsGlyphs: {}, settingsVisibility: {}, FALLBACK_LABEL: {},
     providerList: () => [{ id, label: '<img src=x onerror=attack()>' }],
     notchOn: () => [{ provider: id }], notchSlotOf: () => ({ provider: id }),
     statusText: () => '<script>attack()</script>', ui: (key, fallback) => fallback,
@@ -116,11 +116,28 @@ test('provider SVGs remain image resources and unsafe glyph URLs use escaped fal
     'data:image/png;base64,AAAA" onerror="attack()',
   ]) {
     c.settingsGlyphs.codex = { url: unsafe };
-    assert.equal(c.settingsGlyph('codex'), '<span>C</span>', unsafe);
+    assert.equal(c.settingsGlyph('codex'), '<img src="glyphs/codex.svg" alt="" class="settings-provider-image">', unsafe);
   }
   c.settingsGlyphs.codex = { svg };
-  assert.equal(c.settingsGlyph('codex'), '<span>C</span>');
+  assert.equal(c.settingsGlyph('codex'), '<img src="glyphs/codex.svg" alt="" class="settings-provider-image">');
   assert.equal(c.settingsGlyph('<bad>'), '<span>&lt;</span>');
+  assert.equal(c.settingsGlyph('constructor'), '<span>c</span>');
+});
+
+test('every known provider has packaged canonical artwork when absent from runtime glyphs', () => {
+  const c = contextFor(['esc', 'settingsGlyph'], { settingsGlyphs: {}, FALLBACK_LABEL: {} });
+  for (const id of ['claude', 'codex', 'cursor', 'gemini']) {
+    assert.equal(c.settingsGlyph(id), `<img src="glyphs/${id}.svg" alt="" class="settings-provider-image">`);
+    const original = fs.readFileSync(path.join(__dirname, `../codenotch/glyphs/${id}.svg`), 'utf8');
+    const packaged = fs.readFileSync(path.join(__dirname, `../codenotch/ui/glyphs/${id}.svg`), 'utf8');
+    assert.equal(packaged, original.replaceAll('currentColor', '#e8e8ea'));
+    assert.match(packaged, /<svg\b/);
+    assert.doesNotMatch(packaged, /currentColor/);
+  }
+  c.settingsGlyphs.cursor = { url: 'data:image/png;base64,Qw==' };
+  assert.match(c.settingsGlyph('cursor'), /src="data:image\/png;base64,Qw=="/);
+  assert.equal(c.settingsGlyph('../outside'), '<span>.</span>');
+  assert.ok(fs.existsSync(path.join(__dirname, '../codenotch/ui/glyphs/NOTICE.md')));
 });
 
 test('live preview follows selected provider IDs and scale without fabricated usage readings', () => {
@@ -159,7 +176,11 @@ test('live preview follows selected provider IDs and scale without fabricated us
 
 test('navigation glyphs preserve labelled buttons and stay hidden from accessible names', () => {
   const tabs = Array.from(declaration('TABS'));
-  const buttons = Object.fromEntries(tabs.map(id => [id, { textContent: id, children: [], prepend(node) { this.children.unshift(node); } }]));
+  const buttons = Object.fromEntries(tabs.map(id => [id, {
+    textContent: id, children: [],
+    querySelector(selector) { return selector === '.settings-nav-icon' ? this.children.find(node => node.attributes.class === 'settings-nav-icon') : null; },
+    prepend(node) { this.children.unshift(node); node.remove = () => { this.children.splice(this.children.indexOf(node), 1); }; },
+  }]));
   const c = contextFor(['decorateNavigation'], {
     document: {
       getElementById: id => buttons[id.replace('tab-', '')],
@@ -167,14 +188,31 @@ test('navigation glyphs preserve labelled buttons and stay hidden from accessibl
     },
   });
   c.decorateNavigation();
+  c.decorateNavigation();
   for (const id of tabs) {
     const button = buttons[id];
     assert.equal(button.textContent, id);
     assert.equal(button.children.length, 1);
     assert.equal(button.children[0].tag, 'svg');
     assert.equal(button.children[0].attributes['aria-hidden'], 'true');
-    assert.equal(button.children[0].children[0].tag, 'path');
-    assert.ok(button.children[0].children[0].attributes.d);
+    assert.equal(button.children[0].attributes.focusable, 'false');
+    assert.equal(button.children[0].attributes.viewBox, '0 0 32 32');
+    assert.equal(button.children[0].attributes.fill, 'none');
+    assert.equal(button.children[0].attributes.stroke, undefined, 'filled badge must not inherit a root outline');
+    assert.ok(button.children[0].children.length > 0);
+    let filled = 0;
+    for (const shape of button.children[0].children) {
+      assert.ok(['path', 'rect', 'circle'].includes(shape.tag));
+      assert.ok(Object.keys(shape.attributes).length > 0);
+      assert.ok(shape.attributes.fill === 'none' || /^#[a-f0-9]{6}$/i.test(shape.attributes.fill), 'every shape has an explicit safe fill');
+      if (shape.attributes.fill !== 'none') filled++;
+      else assert.match(shape.attributes.stroke, /^#[a-f0-9]{6}$/i);
+      for (const [attribute, value] of Object.entries(shape.attributes)) {
+        assert.doesNotMatch(attribute, /^on|href|style/i);
+        assert.doesNotMatch(String(value), /NaN|Infinity|url\(/);
+      }
+    }
+    assert.ok(filled > 0, 'each navigation badge includes solid geometry');
   }
 });
 

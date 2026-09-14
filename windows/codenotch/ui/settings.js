@@ -33,17 +33,42 @@ function esc(s){
 let settingsGlyphs={},settingsVisibility={};
 function settingsGlyph(id){
   const g=settingsGlyphs[id],url=g&&g.url;
-  return typeof url==='string'&&/^data:image\/(?:svg\+xml|png);base64,[A-Za-z0-9+/]+=*$/.test(url)
-    ? '<img src="'+url+'" alt="" class="settings-provider-image">'
-    : '<span>'+esc((FALLBACK_LABEL[id]||id).slice(0,1))+'</span>';
-}
-function decorateNavigation(){
-  const paths={tray:'M4 5h16v11H4zM8 20h8M12 16v4',notch:'M5 4h14v16H5zM15 8h4v8h-4z',modules:'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',behaviour:'M4 7h16M4 17h16M8 4v6M16 14v6',hooks:'m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16',about:'M12 16v-5m0-4v1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0'};
-  for(const [id,path] of Object.entries(paths)){const b=document.getElementById('tab-'+id);if(!b)continue;const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.6');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');const p=document.createElementNS(svg.namespaceURI,'path');p.setAttribute('d',path);svg.append(p);b.prepend(svg);}
+  if(typeof url==='string'&&/^data:image\/(?:svg\+xml|png);base64,[A-Za-z0-9+/]+=*$/.test(url)){
+    return '<img src="'+url+'" alt="" class="settings-provider-image">';
+  }
+  // Known provider artwork is packaged with the settings page even when the
+  // provider is hidden and consequently omitted from the runtime glyph response.
+  const builtins={claude:'glyphs/claude.svg',codex:'glyphs/codex.svg',cursor:'glyphs/cursor.svg',gemini:'glyphs/gemini.svg'};
+  if(Object.prototype.hasOwnProperty.call(builtins,id)){
+    return '<img src="'+builtins[id]+'" alt="" class="settings-provider-image">';
+  }
+  const label=Object.prototype.hasOwnProperty.call(FALLBACK_LABEL,id)?FALLBACK_LABEL[id]:String(id);
+  return '<span>'+esc(label.slice(0,1))+'</span>';
 }
 
-/* The three usage bands, byte-for-byte the ones trayicon.rs paints, so a dot in the picker is the
-   same colour as the pixels in the preview. They are the only saturated colours in this window. */
+function decorateNavigation(){
+  // Original two-tone geometric badges, inspired by the user's selected neon reference.
+  const lime='#d8f34b',pink='#f77bea',violet='#683af0',cream='#f6f4db',charcoal='#242523';
+  const burst=Array.from({length:24},(_,i)=>{const angle=(i*15-90)*Math.PI/180,r=i%2?11.8:15.4;return (i?'L':'M')+(16+Math.cos(angle)*r).toFixed(2)+' '+(16+Math.sin(angle)*r).toFixed(2);}).join(' ')+'Z';
+  const icons={
+    tray:[['circle',{cx:16,cy:16,r:15,fill:lime}],['rect',{x:6.5,y:8.5,width:19,height:13.5,rx:3,fill:charcoal}],['rect',{x:9,y:11,width:14,height:8,rx:1,fill:lime}],['path',{d:'M14 22h4v2h3v2H11v-2h3Z',fill:charcoal}]],
+    notch:[['rect',{x:1,y:1,width:30,height:30,rx:10,fill:pink}],['path',{d:'M8.5 7.5h15a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Zm.5 3v11h14v-11H9Z',fill:charcoal,'fill-rule':'evenodd'}],['path',{d:'M25 12h-4a3 3 0 0 0-3 3v2a3 3 0 0 0 3 3h4Z',fill:charcoal}]],
+    modules:[['rect',{x:4.7,y:4.7,width:22.6,height:22.6,rx:4,transform:'rotate(45 16 16)',fill:violet}],['circle',{cx:16,cy:10.5,r:3.35,fill:cream}],['circle',{cx:10.5,cy:20,r:3.35,fill:cream}],['circle',{cx:21.5,cy:20,r:3.35,fill:cream}]],
+    behaviour:[['path',{d:burst,fill:lime}],['circle',{cx:16,cy:16,r:8.2,fill:'none',stroke:charcoal,'stroke-width':2}],['circle',{cx:16,cy:16,r:3.8,fill:charcoal}]],
+    hooks:[['circle',{cx:16,cy:16,r:15,fill:violet}],['path',{d:'M16 4.5 18.6 12.4 25.8 7.2 21.3 14 28 16 21.3 18 25.8 24.8 18.6 19.6 16 27.5 13.4 19.6 6.2 24.8 10.7 18 4 16 10.7 14 6.2 7.2 13.4 12.4Z',fill:cream}]],
+    about:[['circle',{cx:16,cy:16,r:15,fill:charcoal}],['circle',{cx:16,cy:16,r:9.5,fill:'none',stroke:lime,'stroke-width':1.65}],['path',{d:'M6.5 16h19M16 6.5c-6 4-6 15 0 19m0-19c6 4 6 15 0 19M16 6.5v19M8.5 11.5c5 2 10 2 15 0M8.5 20.5c5-2 10-2 15 0',fill:'none',stroke:lime,'stroke-width':1.5}]]
+  };
+  for(const [id,shapes] of Object.entries(icons)){
+    const button=document.getElementById('tab-'+id);if(!button)continue;
+    button.querySelector('.settings-nav-icon')?.remove();
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    for(const [key,value] of Object.entries({class:'settings-nav-icon',viewBox:'0 0 32 32','aria-hidden':'true',focusable:'false',fill:'none','stroke-linecap':'round','stroke-linejoin':'round'}))svg.setAttribute(key,value);
+    for(const [tag,attributes] of shapes){const shape=document.createElementNS(svg.namespaceURI,tag);for(const [key,value] of Object.entries(attributes))shape.setAttribute(key,String(value));svg.append(shape);}button.prepend(svg);
+  }
+}
+
+/* The three usage bands match trayicon.rs, so usage dots and preview pixels agree.
+   Decorative navigation badges use their own fixed palette. */
 function band(p){ return p < 50 ? '#4ade80' : p < 80 ? '#facc15' : '#f87171'; }
 
 /* Fallback names, used only until get_tray_options answers (or if it never does). */
