@@ -126,14 +126,18 @@
   }
   #notice.show{display:block}
 </style>
+<link rel="stylesheet" href="accounts-drawer.css">
 </head>
 <body>
 <div id="root">
   <div id="card"></div>
   <div id="tail"></div>
+  <button id="drawer-collapse" type="button" title="Свернуть панель" aria-label="Свернуть панель">›</button>
   <div id="pill"></div><!-- one .cell per provider, stacked vertically (upstream: data-driven, the same layout for 1–5 cells) -->
   <div id="notice"></div>
 </div>
+<script src="accounts-model.js"></script>
+<script src="accounts-drawer.js"></script>
 <script src="notch.js"></script>
 </body>
 </html>

@@ -26,9 +26,9 @@ use tauri::{AppHandle, Emitter, Manager};
 
 /// Logical size of the notch window: the 70 pt pill column on the right plus room for the hover card
 /// and its tail on the left. `fitZoom` in ui/notch.html divides by the same width.
-pub const NOTCH_W: f64 = 360.0;
+pub const NOTCH_W: f64 = 390.0;
 /// Hand-bumped build tag, written to run.log at startup so a log can always be matched to the exe that wrote it.
-pub const BUILD: &str = "r32-accounts";
+pub const BUILD: &str = "r33-compact-drawer";
 pub const NOTCH_H: f64 = 520.0; // 300 clipped the card once it held three window blocks plus the session list; 460 clipped Antigravity's two model groups once the reading was stale and an agent was working
 
 pub struct AppState {
@@ -335,11 +335,23 @@ fn get_codex_accounts() -> Vec<codex::CodexAccount> {
 
 #[tauri::command]
 fn open_codex_accounts(app: AppHandle) {
-    if let Some(w) = app.get_webview_window("accounts") {
+    DRAWER_REQUEST.store(true, std::sync::atomic::Ordering::Relaxed);
+    DRAWER_HOLD_UNTIL.store(epoch_ms() + 8000, std::sync::atomic::Ordering::Relaxed);
+    if let Some(w) = app.get_webview_window("notch") {
         let _ = w.show();
-        let _ = w.unminimize();
-        let _ = w.set_focus();
     }
+    let _ = app.emit("show_codex_accounts", ());
+}
+
+static DRAWER_REQUEST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static DRAWER_HOLD_UNTIL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+fn epoch_ms() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+#[tauri::command]
+fn take_codex_drawer_request() -> bool {
+    DRAWER_REQUEST.swap(false, std::sync::atomic::Ordering::Relaxed)
 }
 
 /// A click on a cell opens that provider's usage page
@@ -483,7 +495,7 @@ fn cursor_in_hot(rects: &[[f64; 4]], lx: f64, ly: f64, window: Option<(f64, f64)
 const WATCHDOG_MS: u64 = 50;
 /// Kept at the original 300 ms rather than falling out of the faster poll, which would make the
 /// card twitchy.
-const LEAVE_MS: u64 = 300;
+const LEAVE_MS: u64 = 450;
 
 /// WebView2's mouseleave is unreliable inside a NOACTIVATE transparent window — a cursor that
 /// leaves quickly often produces no WM_MOUSELEAVE, and the card stays up. Rather than trust DOM
@@ -535,8 +547,13 @@ fn start_pointer_watchdog(app: AppHandle) {
                 continue;
             }
             if inside {
+                DRAWER_HOLD_UNTIL.store(0, std::sync::atomic::Ordering::Relaxed);
                 miss = 0;
             } else {
+                if epoch_ms() < DRAWER_HOLD_UNTIL.load(std::sync::atomic::Ordering::Relaxed) {
+                    miss = 0;
+                    continue;
+                }
                 miss += 1;
                 if miss >= need {
                     miss = 0;
@@ -1169,6 +1186,7 @@ fn main() {
             get_codex_accounts,
             get_provider_visibility,
             open_codex_accounts,
+            take_codex_drawer_request,
             get_state,
             get_usage,
             get_codex,
@@ -1219,7 +1237,7 @@ fn main() {
             tray::setup(&handle)?;
             // Closing a Tauri window destroys it by default, and a destroyed window cannot be shown
             // again — which is why Settings opened once and then never again. Hide it instead.
-            for label in ["settings", "accounts"] {
+            for label in ["settings"] {
               if let Some(w) = handle.get_webview_window(label) {
                 let hide_me = w.clone();
                 w.on_window_event(move |e| {

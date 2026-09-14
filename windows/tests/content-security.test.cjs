@@ -13,10 +13,16 @@ vm.runInContext(glyphFunction + '\n' + escapeFunction, context);
 const provider = {id:'codex',name:'Codex',glyph:'Cx'};
 
 test('complete UI JavaScript parses', () => { new vm.Script(script); });
+test('native viewport does not enlarge the 286px drawer',()=>{
+  const style={};const c=vm.createContext({innerWidth:390,document:{documentElement:{style}}});
+  const fn=script.slice(script.indexOf('function fitZoom()'),script.indexOf('function reportDpr()'));
+  vm.runInContext(fn,c);assert.equal(c.fitZoom(),1);assert.equal(style.zoom,'');
+  c.innerWidth=780;assert.equal(c.fitZoom(),2);
+});
 test('native hit regions follow panel, card visibility, and DPI without a full-window rectangle', () => {
   let expanded=false;
   const pill={style:{},rect:[540,140,140,640]};
-  const card={rect:[20,180,492,420],classList:{contains:()=>expanded}};
+  const card={rect:[20,180,492,420],classList:{contains:name=>name==='show'&&expanded}};
   const c=vm.createContext({pill,card,tail:{rect:[512,200,64,72]},scalePct:100,window:{devicePixelRatio:2},rectOf:el=>el.rect});
   const fn=script.slice(script.indexOf('function visibleHitRects()'),script.indexOf('function updateHitRegions()'));
   vm.runInContext(fn,c);
@@ -85,9 +91,9 @@ test('text and attribute delimiters are escaped', () => {
   assert.equal(context.esc(null), '');
 });
 test('usage card escapes provider notes and labels', () => {
-  const card = {innerHTML:''};
-  const c = vm.createContext({document:{getElementById:()=>card},uiLang:'en',scalePct:100,wireScaleRow:()=>{},textCopy:s=>s, hoverId:'codex', stateSnap:{sessions:[]}, activity:[], placeCard:()=>{},updateHitRegions:()=>{}, glyphHtml:()=>'', staleOf:()=>false, tone:()=>'', resetCopy:()=>'',
-    providers:()=>[{id:'codex',name:'Codex',snap:{status:'ok',windows:[{label:'<img onerror="alert(1)">',used:0.5}],note:'<svg onload="alert(1)">',fetched_at:0}}]});
+  const card = {innerHTML:'',classList:{toggle(){}}};
+  const c = vm.createContext({document:{getElementById:()=>card},uiLang:'en',scalePct:100,wireScaleRow:()=>{},textCopy:s=>s, hoverId:'claude', stateSnap:{sessions:[]}, activity:[], placeCard:()=>{},updateHitRegions:()=>{}, glyphHtml:()=>'', staleOf:()=>false, tone:()=>'', resetCopy:()=>'',
+    providers:()=>[{id:'claude',name:'Claude',snap:{status:'ok',windows:[{label:'<img onerror="alert(1)">',used:0.5}],note:'<svg onload="alert(1)">',fetched_at:0}}]});
   const fn = script.slice(script.indexOf('function renderCard()'),script.indexOf('// The card follows'));
   const tasks=script.slice(script.indexOf('const expandedProviders='),script.indexOf('function renderCard()'));
   vm.runInContext(escapeFunction+'\n'+tasks+'\n'+fn+'\nrenderCard();', c);

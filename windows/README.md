@@ -34,13 +34,13 @@ shows an error or the last reading marked stale. Codenotch does not automate sig
 
 ## Install / build
 
-### Windows 0.4.0: Codex accounts
+### Windows 0.4.1: compact Codex drawer
 
-Open **Codex accounts** from Settings or the Codex hover card. The panel discovers
+Hover or click the Codex ring to open the compact drawer at the screen edge. There is no separate Accounts window. The drawer discovers
 the default `%USERPROFILE%\.codex` and immediate `.codex-*` directories containing
-`auth.json`. Each profile has its own limit cards and last successful update time.
-Sort by remaining allowance (the tightest available limit) or the nearest reset;
-the choice is saved. The primary badge means the identity matches the default
+`auth.json`. Each profile occupies a compact two-line row with its weekly remaining quota. Additional limits expand only when requested.
+Sort by weekly remaining allowance or the nearest weekly reset;
+the choice is saved. The subtle green outline means the identity matches the default
 profile, not that a particular running Codex task uses it.
 
 The panel reads existing sign-ins only. It does not sign in, switch accounts,
@@ -58,7 +58,9 @@ migrate to the new visibility switch. Account-panel behavior is inspired by
 nglain/codex-account-monitor at `81d1def`; the Windows UI and polling are implemented
 in Rust and JavaScript.
 
-`codenotch.exe --accounts` opens the account panel; `--settings` opens settings,
+The 286-pixel drawer follows the macOS CompactCodexDrawer layout: 49-pixel header/footer, 58-pixel rows and a small collapse handle. Settings, sorting and refresh use icon controls.
+
+`codenotch.exe --accounts` opens the drawer; `--settings` opens settings,
 including when the application is already running.
 
 Checks: `cargo test` and `node --test tests/*.test.cjs` from `windows/`.

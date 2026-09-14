@@ -3,8 +3,7 @@
   "description": "Codenotch notch & settings windows: allow core APIs (event.listen is required for state broadcasts, and the settings window needs them too)",
   "windows": [
     "notch",
-    "settings",
-    "accounts"
+    "settings"
   ],
   "permissions": [
     "core:default"

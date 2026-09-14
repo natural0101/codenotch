@@ -263,8 +263,11 @@ function renderTasks(provider){
 }
 function renderCard(){
   const c=document.getElementById('card');
-  const p=providers().find(x=>x.id===hoverId)||providers()[0];
+  const p=hoverId==='codex'?{id:'codex',name:'Codex',snap:codexSnap}:(providers().find(x=>x.id===hoverId)||providers()[0]);
   if(!p){hideCard();return;}
+  c.classList.toggle('codex-drawer',p.id==='codex');
+  document.getElementById('root').classList.toggle('drawer-open',p.id==='codex');
+  if(p.id==='codex'){renderAccountsDrawer(c);placeCard();return;}
   const snap=p.snap;
   const headIcon=glyphHtml(p,true);
   let html=`<div class="c-head">${headIcon}<span class="c-title">${uiLang==='ru'?'Использование '+p.name:p.name+' Usage'}</span></div>`;
@@ -299,7 +302,7 @@ function renderCard(){
   }
   html+=renderTasks(p.id);
   html+=`<div class="c-scale"><input id="scale-range" type="range" min="40" max="100" step="5" value="${scalePct}" aria-label="${textCopy('Notch size')}" title="${textCopy('Notch size')}"><span class="c-scale-val" id="scale-val">${scalePct}%</span></div>`;
-  if(p.id==='codex')html+=`<button type="button" class="accounts-open">${uiLang==='ru'?'Аккаунты Codex':'Codex accounts'} ↗</button>`;
+
   c.innerHTML=html;
   wireScaleRow();
   placeCard();
@@ -312,6 +315,7 @@ function placeCard(){
   const H=innerHeight, ch=card.offsetHeight||0;
   let top=Math.round(cy-ch/2); top=Math.max(8,Math.min(top,H-ch-8));
   card.style.top=top+'px'; card.style.transform='none';
+  const collapse=document.getElementById('drawer-collapse');collapse.style.top=Math.round(top+ch/2-22)+'px';
   // The tail's point on the hovered ring (not the cell, which includes the label below it), kept off the card's rounded corners
   const rr=(cell.querySelector('.ringwrap')||cell).getBoundingClientRect(), ry=rr.top+rr.height/2;
   const th=tail.offsetHeight||36, ty=Math.max(top+16+th/2,Math.min(top+ch-16-th/2,ry));
@@ -323,15 +327,16 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 /* Hover: stays expanded while either the pill or the card is under the cursor; collapses after a 250 ms grace period (upstream motion rule) */
 const card=document.getElementById('card'), pill=document.getElementById('pill'), tail=document.getElementById('tail');
 card.addEventListener('click',e=>{
-  if(e.target.closest('.accounts-open'))invoke('open_codex_accounts').catch(e=>notice(String(e)));
+
   const button=e.target.closest('button[data-more]');if(!button)return;
   const id=button.dataset.more;if(expandedProviders.has(id))expandedProviders.delete(id);else expandedProviders.add(id);
   renderCard();armWatchdog();
 });
-let hideTimer=null;
+let hideTimer=null,explicitDrawerUntil=0;
 function showCard(){clearTimeout(hideTimer);card.classList.add('show');renderCard();armWatchdog();} // show first, then render: placeCard needs offsetHeight
-function hideCard(){expandedProviders.clear();card.classList.remove('show');reportHot();}
-function scheduleHide(){clearTimeout(hideTimer);hideTimer=setTimeout(hideCard,250);}
+document.getElementById('drawer-collapse').addEventListener('click',hideCard);
+function hideCard(){explicitDrawerUntil=0;document.getElementById('root').classList.remove('drawer-open');expandedProviders.clear();card.classList.remove('show');reportHot();}
+function scheduleHide(){if(Date.now()<explicitDrawerUntil)return;clearTimeout(hideTimer);hideTimer=setTimeout(hideCard,450);}
 // ===== Diagnostics + geometry =====
 function jslog(m){invoke('log_js',{msg:String(m)}).catch(()=>{});}
 function callq(cmd,args){ // invoke with visible failure: any command error is reported on screen (a silent .catch used to swallow them)
@@ -343,12 +348,13 @@ function rectOf(el){const r=el.getBoundingClientRect(),k=window.devicePixelRatio
    when the card opens: a stale pill rectangle is a pill that cannot be clicked. */
 function reportHot(){
   const open=card.classList.contains('show');
-  const rects=open?[rectOf(pill),rectOf(tail),rectOf(card)]:[rectOf(pill)];
+  const rects=open&&hoverId==='codex'?visibleHitRects():open?[rectOf(pill),rectOf(tail),rectOf(card)]:[rectOf(pill)];
   callq('set_hot',{rects,expanded:open}).catch(()=>{});
   updateHitRegions();
 }
 let lastHitRegions='';
 function visibleHitRects(){
+  if(card.classList.contains('show')&&card.classList.contains('codex-drawer')){const c=rectOf(card),b=rectOf(document.getElementById('drawer-collapse'));return [c,b,[c[0]+c[2],b[1],Math.max(0,b[0]-c[0]-c[2]),b[3]]];}
   const p=rectOf(pill),k=window.devicePixelRatio||1,f=26*k*scalePct/100;
   const rects=pill.style.display==='none'?[]:[p,[p[0]+p[2]-f,p[1]-f,f,f],[p[0]+p[2]-f,p[1]+p[3],f,f]];
   if(rects.length&&card.classList.contains('show'))rects.push(rectOf(card),rectOf(tail));
@@ -402,10 +408,10 @@ function loadScale(){
 function armWatchdog(){
   requestAnimationFrame(reportHot); // wait one frame so renderCard's new content is laid out before measuring
 }
-// Viewport fit (pure front-end fallback, independent of Rust): the window is NOTCH_W (360) × primary scale physical px,
+// Viewport fit (pure front-end fallback, independent of Rust): the window is NOTCH_W (390) × primary scale physical px,
 // so if this page's CSS viewport is not 360 wide the WebView's DPR disagrees with the monitor; CSS zoom pulls the layout back to the design size.
 function fitZoom(){
-  const z=innerWidth/360;
+  const z=innerWidth/390;
   document.documentElement.style.zoom=(Math.abs(z-1)>0.02)?String(z):'';
   return z;
 }
@@ -427,6 +433,7 @@ function cellAt(x,y){
   return null;
 }
 function pointerInHot(x,y){
+  if(card.classList.contains('show')&&hoverId==='codex'){const c=card.getBoundingClientRect(),b=document.getElementById('drawer-collapse').getBoundingClientRect();return inRect(x,y,c,4)||inRect(x,y,b,4);}
   const p=pill.getBoundingClientRect();
   if(inRect(x,y,p,4))return true;
   if(!card.classList.contains('show'))return false;
@@ -440,8 +447,9 @@ document.addEventListener('mousemove',e=>{
   if(dragging)return; // no card while dragging
   const hot=pointerInHot(e.clientX,e.clientY);
   if(hot){
+    explicitDrawerUntil=0;
     clearTimeout(hideTimer);
-    const id=cellAt(e.clientX,e.clientY);
+    const id=card.classList.contains('show')&&hoverId==='codex'?null:cellAt(e.clientX,e.clientY);
     if(id&&id!==hoverId){ hoverId=id; if(card.classList.contains('show')){ renderCard(); armWatchdog(); } }
     if(!card.classList.contains('show')) showCard();
   }
@@ -450,7 +458,7 @@ document.addEventListener('mousemove',e=>{
 document.addEventListener('mouseout',e=>{ // relatedTarget null = the cursor left the page
   if(!e.relatedTarget && card.classList.contains('show')){ if(hideLogged++<5) jslog('mouseout left the page -> collapse'); scheduleHide(); }
 });
-listen('pointer_left',()=>{if(scaleDragging)return;clearTimeout(hideTimer);hideCard();}).catch(()=>{});
+listen('pointer_left',()=>{if(scaleDragging||Date.now()<explicitDrawerUntil)return;clearTimeout(hideTimer);hideCard();}).catch(()=>{});
 // The size can also be changed from the settings window, which is a different window entirely.
 // Ignore it while this page's own slider is being dragged, or the two would fight each other.
 listen('scale',e=>{
@@ -477,7 +485,7 @@ document.addEventListener('mousemove',e=>{
 });
 document.addEventListener('mouseup',e=>{
   if(e.button!==0)return;
-  if(press&&!dragging) invoke('open_provider_page',{provider:press.id}).catch(()=>{});
+  if(press&&!dragging){if(press.id==='codex')openAccountsDrawer();else invoke('open_provider_page',{provider:press.id}).catch(()=>{});}
   press=null;
 });
 listen('drag_end',()=>{dragging=false;press=null;reportHot();}).catch(()=>{});
@@ -517,3 +525,22 @@ invoke('get_codex').then(u=>{codexSnap=u||codexSnap;renderRing();}).catch(()=>{}
 invoke('get_usage').then(u=>{usage=u||usage;renderRing();}).catch(e=>notice('get_usage failed: '+e));
 invoke('get_state').then(s=>{stateSnap=s||stateSnap;setUiLanguage(stateSnap.lang_resolved);renderRing();}).catch(()=>{});
 setInterval(renderRing,30_000); // stale state and reset copy move with time
+
+// The account drawer is part of the same edge window and uses its existing hover/hit regions.
+let codexAccounts=[],accountRefreshing=false,accountRefreshTimer=null;
+let accountSort='remaining';const accountExpanded=new Set();
+try{accountSort=localStorage.getItem('codenotch.accounts.sort')==='reset'?'reset':'remaining';}catch{}
+function redrawAccounts(){if(card.classList.contains('show')&&hoverId==='codex'){renderCard();armWatchdog();}}
+function renderAccountsDrawer(host){
+  window.CodexDrawer.render(host,{accounts:codexAccounts,lang:uiLang,sort:accountSort,expanded:accountExpanded,refreshing:accountRefreshing,
+    sortChange:()=>{accountSort=accountSort==='remaining'?'reset':'remaining';try{localStorage.setItem('codenotch.accounts.sort',accountSort);}catch{}redrawAccounts();},
+    settings:()=>invoke('open_settings').catch(e=>notice(String(e))),
+    expand:id=>{if(accountExpanded.has(id))accountExpanded.delete(id);else accountExpanded.add(id);redrawAccounts();},
+    refresh:()=>{if(accountRefreshing)return;accountRefreshing=true;redrawAccounts();accountRefreshTimer=setTimeout(()=>{accountRefreshing=false;notice(uiLang==='ru'?'Обновление ещё не завершено':'Refresh still pending');redrawAccounts();},60000);invoke('refresh_usage').catch(e=>{clearTimeout(accountRefreshTimer);accountRefreshing=false;notice(String(e));redrawAccounts();});}
+  });
+}
+invoke('get_codex_accounts').then(a=>{codexAccounts=Array.isArray(a)?a:[];redrawAccounts();}).catch(e=>notice(String(e)));
+listen('codex_accounts',e=>{if(!Array.isArray(e.payload))return;codexAccounts=e.payload;accountRefreshing=false;clearTimeout(accountRefreshTimer);redrawAccounts();}).catch(()=>{});
+function openAccountsDrawer(){explicitDrawerUntil=Date.now()+8000;hoverId='codex';showCard();}
+listen('show_codex_accounts',()=>{invoke('take_codex_drawer_request').catch(()=>{});openAccountsDrawer();}).catch(()=>{});
+invoke('take_codex_drawer_request').then(open=>{if(open)openAccountsDrawer();}).catch(()=>{});
