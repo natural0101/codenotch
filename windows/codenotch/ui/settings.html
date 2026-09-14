@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Codenotch Settings</title>
+<style>
+  /* Same visual language as notch.html: near-black panels, #1e1e1e rules, Segoe UI, muted greys.
+     The only saturated colours are the three usage bands the tray icon itself draws
+     (trayicon.rs band_color): under 50% green, under 80% yellow, else red. Nothing else is
+     coloured — no accent, no gradient, no shadow. */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%}
+  body{
+    background:#0a0a0a;color:#fff;font-family:"Segoe UI",system-ui,sans-serif;font-size:13px;
+    overflow:hidden;user-select:none;
+  }
+
+  /* ---- the two columns: a fixed sidebar of tabs, a scrolling pane beside it ----------------
+     The window is resizable down to 460x520. Only #main scrolls, so the tab list stays put and
+     nothing is ever clipped: at the smallest size the content column is 310 px wide and every
+     row inside it wraps rather than overflowing. */
+  #shell{display:flex;height:100%;min-height:0}
+
+  #side{
+    flex:0 0 150px;width:150px;min-width:150px;background:#0d0d0d;border-right:1px solid #1e1e1e;
+    overflow-y:auto;overflow-x:hidden;padding:14px 8px 20px;
+  }
+  .s-group{
+    font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#6a6a6a;
+    padding:14px 8px 6px;
+  }
+  .s-group.first{padding-top:0}
+  .tab{
+    display:block;width:100%;text-align:left;background:none;border:1px solid transparent;
+    border-radius:8px;color:#b0b0b3;font:inherit;font-size:12.5px;padding:7px 9px;cursor:pointer;
+    margin-bottom:2px;
+  }
+  .tab:hover{background:#141414;color:#e8e8ea}
+  .tab.on{background:#1c1c1c;border-color:#2e2e2e;color:#fff;font-weight:600}
+  .tab:focus-visible{outline:1px solid #8a8a8a;outline-offset:-1px}
+
+  #main{flex:1 1 auto;min-width:0;overflow-y:auto;overflow-x:hidden;padding:16px 18px 30px}
+
+  /* Error strip — every failed command lands here instead of throwing */
+  #strip{
+    display:none;position:sticky;top:0;z-index:5;margin-bottom:12px;
+    font-size:11px;color:#f87171;background:#160e0e;border:1px solid #3a1f1f;
+    border-radius:10px;padding:7px 10px;overflow-wrap:anywhere;
+  }
+  #strip.show{display:block}
+
+  /* ---- pane furniture ---------------------------------------------------------------- */
+  .pane[hidden]{display:none}
+  .p-title{font-size:16px;font-weight:700;color:#fff;margin:0}
+  .p-lede{font-size:11px;color:#808080;margin:4px 0 0;line-height:1.5}
+
+  .block{border-top:1px solid #1e1e1e;margin-top:20px;padding-top:16px}
+  .block.first{border-top:none;margin-top:16px;padding-top:0}
+  .b-head{font-size:13px;font-weight:700;color:#e8e8ea}
+  .b-sub{font-size:11px;color:#808080;margin-top:3px;line-height:1.5}
+
+  .c-title{font-size:14px;font-weight:700;color:#fff}
+  .c-sub{font-size:11px;color:#808080;margin-top:2px;line-height:1.5}
+  .c-note{font-size:11px;color:#c8c8c8;line-height:1.5}
+  .c-note.dim{color:#808080}
+  .c-note[hidden]{display:none}
+
+  /* A setting: words on the left, the control on the right */
+  .row{display:flex;align-items:flex-start;gap:14px;padding:11px 0}
+  .row + .row{border-top:1px solid #161616}
+  .r-text{flex:1 1 auto;min-width:0}
+  .r-name{font-size:12.5px;color:#e8e8ea;font-weight:600}
+  .r-why{font-size:11px;color:#808080;margin-top:3px;line-height:1.5;overflow-wrap:anywhere}
+  .r-ctl{flex:0 0 auto;margin-top:2px}
+
+  /* Real switches, not checkboxes. Greyscale only: pale track when on, dark when off. */
+  .sw{
+    position:relative;width:40px;height:22px;border-radius:11px;background:#242424;
+    border:1px solid #2e2e2e;padding:0;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  .sw .knob{
+    position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:8px;background:#6a6a6a;
+    transition:left .15s,background .15s;
+  }
+  .sw:hover{border-color:#3f3f3f}
+  .sw[aria-checked="true"]{background:#c8c8c8;border-color:#c8c8c8}
+  .sw[aria-checked="true"] .knob{left:20px;background:#0a0a0a}
+  .sw[disabled]{opacity:.45;cursor:default}
+  .sw:focus-visible{outline:1px solid #8a8a8a;outline-offset:2px}
+
+  select{
+    background:#0a0a0a;border:1px solid #2e2e2e;border-radius:9px;color:#e8e8ea;font:inherit;
+    font-size:12px;padding:6px 8px;max-width:100%;cursor:pointer;
+  }
+  select:hover{border-color:#3f3f3f}
+  select:focus-visible{outline:1px solid #8a8a8a;outline-offset:1px}
+
+  .btn{
+    background:#0a0a0a;border:1px solid #2e2e2e;border-radius:9px;color:#e8e8ea;font:inherit;
+    font-size:12px;padding:7px 12px;cursor:pointer;
+  }
+  .btn:hover{border-color:#3f3f3f;background:#141414}
+  .btn:focus-visible{outline:1px solid #8a8a8a;outline-offset:1px}
+
+  /* A correction from Rust: what was asked for was not what was stored */
+  .fix{
+    font-size:11px;color:#c8c8c8;background:#111;border:1px solid #2e2e2e;border-radius:10px;
+    padding:8px 10px;margin-top:10px;line-height:1.5;
+  }
+  .fix[hidden]{display:none}
+
+  /* ---- taskbar icon editor (unchanged behaviour) --------------------------------------- */
+  .modes{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+  .mode{
+    flex:1 1 0;min-width:88px;background:#0a0a0a;border:1px solid #2e2e2e;border-radius:10px;
+    color:#b0b0b3;font:inherit;font-size:12px;padding:8px 6px;cursor:pointer;text-align:center;
+  }
+  .mode:hover{border-color:#3f3f3f;color:#e8e8ea}
+  .mode.on{background:#1c1c1c;border-color:#6a6a6a;color:#fff;font-weight:600}
+  .mode-sub{display:block;font-size:10px;color:#808080;font-weight:400;margin-top:2px}
+  .mode.on .mode-sub{color:#a0a0a3}
+
+  /* Preview row: big pixelated preview + the truth strip at real tray sizes */
+  .previewrow{display:flex;gap:14px;align-items:flex-start;margin-top:14px;flex-wrap:wrap}
+  #canvas{
+    position:relative;width:192px;height:192px;flex:0 0 auto;border-radius:10px;overflow:hidden;
+    border:1px solid #1e1e1e;
+    /* Faint checker so transparent pixels read as transparent, not as black */
+    background-color:#141414;
+    background-image:
+      linear-gradient(45deg,#181818 25%,transparent 25%,transparent 75%,#181818 75%),
+      linear-gradient(45deg,#181818 25%,transparent 25%,transparent 75%,#181818 75%);
+    background-size:16px 16px;background-position:0 0,8px 8px;
+  }
+  #pv{width:100%;height:100%;display:block;image-rendering:pixelated}
+  #pv.hide{display:none}
+  #ph{ /* placeholder for mode "off", where get_tray_preview returns null */
+    position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    gap:10px;text-align:center;padding:14px;
+  }
+  #ph.show{display:flex}
+  /* 96 px is exactly three times the icon's real 32 px, so the pixels stay square and honest */
+  .ph-mark{width:96px;height:96px;display:flex;align-items:center;justify-content:center}
+  .ph-mark img{width:100%;height:100%;image-rendering:pixelated;display:block}
+
+  #regions{position:absolute;inset:0}
+  .region{
+    position:absolute;background:transparent;border:1px solid transparent;border-radius:3px;
+    padding:0;cursor:pointer;font:inherit;
+  }
+  .region:hover{background:rgba(255,255,255,.07);border-color:#4a4a4a}
+  .region.on{background:rgba(255,255,255,.05);border-color:#8a8a8a;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+  .region:focus-visible{outline:1px solid #8a8a8a;outline-offset:1px}
+  .r-num{
+    position:absolute;left:3px;top:2px;font-size:10px;font-weight:700;color:#808080;
+    text-shadow:0 1px 2px #000;
+  }
+  .region.on .r-num{color:#fff}
+
+  .truth{flex:1 1 190px;min-width:170px}
+  .truthstrip{
+    display:flex;align-items:flex-end;gap:14px;background:#000;border:1px solid #1e1e1e;
+    border-radius:10px;padding:12px 14px;margin-top:6px;
+  }
+  .truthcell{display:flex;flex-direction:column;align-items:center;gap:5px}
+  .truthcell img{image-rendering:pixelated;display:block}
+  .truthcell img.hide{visibility:hidden}
+  .truthcell span{font-size:9px;color:#808080;font-variant-numeric:tabular-nums}
+
+  /* Slot chips — the same slots as the overlay regions, reachable when the window is narrow */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+  .chip{
+    display:flex;align-items:center;gap:6px;background:#0a0a0a;border:1px solid #2e2e2e;border-radius:9px;
+    padding:6px 8px;color:#b0b0b3;font:inherit;font-size:11px;cursor:pointer;max-width:100%;min-width:0;
+  }
+  .chip:hover{border-color:#3f3f3f;color:#e8e8ea}
+  .chip.on{border-color:#8a8a8a;background:#1c1c1c;color:#fff}
+  .chip b{font-weight:700;white-space:nowrap}
+  .chip .ctext{color:#808080;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .chip.on .ctext{color:#c8c8c8}
+  /* The chip itself is a plain container. The two things inside it are real buttons side by side,
+     not one nested in the other, so keyboards and screen readers see two distinct controls. */
+  .chip-pick{
+    display:flex;align-items:center;gap:6px;background:none;border:none;color:inherit;font:inherit;
+    cursor:pointer;padding:0;min-width:0;text-align:left;
+  }
+  .chip-x{
+    background:none;border:none;color:#808080;font:inherit;font-size:12px;line-height:1;cursor:pointer;padding:0 2px;
+  }
+  .chip-x:hover{color:#f87171}
+  .chip-add{border-style:dashed}
+
+  /* Picker */
+  .picker{margin-top:14px;border-top:1px solid #1e1e1e;padding-top:12px}
+  .p-head{font-size:11px;color:#808080;margin-bottom:8px}
+  .p-head b{color:#e8e8ea}
+  .p-status{font-size:10px;color:#808080;margin-left:auto;white-space:nowrap}
+  .p-status.warn{color:#facc15}
+  .p-item{
+    display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#0a0a0a;
+    border:1px solid #1a1a1a;border-radius:9px;padding:7px 9px;margin-bottom:4px;color:#e8e8ea;
+    font:inherit;font-size:12px;cursor:pointer;min-width:0;
+  }
+  .p-item:hover{border-color:#3f3f3f;background:#141414}
+  .p-item.on{border-color:#8a8a8a;background:#1c1c1c}
+  .p-item:focus-visible{outline:1px solid #8a8a8a;outline-offset:1px}
+  .p-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .p-pct{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:#b0b0b3;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .p-dot{width:7px;height:7px;border-radius:4px;flex:0 0 auto}
+  .p-tick{width:12px;flex:0 0 auto;color:#fff;font-size:11px}
+
+  /* Notch providers — the picker's rows again, ticked rather than chosen */
+  .np-list{margin-top:12px}
+  .np-row{margin-bottom:10px}
+  .np-ag{display:flex;align-items:center;gap:8px;margin:6px 0 0 29px;font-size:11px;color:#808080}
+  .np-right{margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0}
+  .np-right .p-status{margin-left:0}
+  .np-lock{font-size:10px;color:#808080;font-style:italic}
+  .p-item.lock{cursor:default}
+
+  /* Notch size */
+  .c-scale{display:flex;align-items:center;gap:10px;margin-top:12px}
+  .c-scale input[type=range]{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:3px;border-radius:2px;background:#2d2d2d;outline:none}
+  .c-scale input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:#2d2d2d}
+  .c-scale input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;margin-top:-4.5px;border-radius:50%;background:#8a8a8a;cursor:pointer}
+  .c-scale input[type=range]:hover::-webkit-slider-thumb{background:#b0b0b3}
+  .c-scale-val{font-size:11px;color:#c8c8c8;min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
+
+  /* About */
+  .about-top{display:flex;align-items:center;gap:12px;margin-top:16px}
+  .about-mark{width:40px;height:40px;image-rendering:pixelated;display:block;flex:0 0 auto}
+  .about-name{font-size:15px;font-weight:700;color:#fff}
+  .about-ver{font-size:11px;color:#808080;margin-top:2px;font-variant-numeric:tabular-nums}
+  .path{
+    font-family:Consolas,"Courier New",monospace;font-size:11px;color:#b0b0b3;background:#0a0a0a;
+    border:1px solid #1e1e1e;border-radius:8px;padding:6px 8px;margin-top:8px;overflow-wrap:anywhere;
+    user-select:text;
+  }
+
+  /* Quiet "Saved" confirmation */
+  #toast{
+    position:fixed;right:14px;bottom:12px;background:#1c1c1c;border:1px solid #2e2e2e;border-radius:9px;
+    padding:5px 10px;font-size:11px;color:#c8c8c8;opacity:0;transition:opacity .35s ease;pointer-events:none;
+  }
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="shell">
+
+  <!-- ---- the tab list ------------------------------------------------------------------ -->
+  <nav id="side" role="tablist" aria-orientation="vertical" aria-label="Settings sections">
+    <div class="s-group first">Appearance</div>
+    <button class="tab" id="tab-tray" role="tab" aria-controls="pane-tray" aria-selected="false" tabindex="-1">Taskbar icon</button>
+    <button class="tab" id="tab-notch" role="tab" aria-controls="pane-notch" aria-selected="false" tabindex="-1">Notch</button>
+    <div class="s-group">General</div>
+    <button class="tab" id="tab-behaviour" role="tab" aria-controls="pane-behaviour" aria-selected="false" tabindex="-1">Behaviour</button>
+    <button class="tab" id="tab-hooks" role="tab" aria-controls="pane-hooks" aria-selected="false" tabindex="-1">Claude Code</button>
+    <button class="tab" id="tab-about" role="tab" aria-controls="pane-about" aria-selected="false" tabindex="-1">About</button>
+  </nav>
+
+  <!-- ---- the panes --------------------------------------------------------------------- -->
+  <main id="main">
+    <div id="strip"></div>
+
+    <!-- APPEARANCE / Taskbar icon ------------------------------------------------------- -->
+    <section class="pane" id="pane-tray" role="tabpanel" aria-labelledby="tab-tray" tabindex="0" hidden>
+      <h1 class="p-title">Taskbar icon</h1>
+      <p class="p-lede">The small icon down by the clock. Codenotch draws your usage straight into it — 32 pixels square. Pick a layout, then click a part of the picture to choose what that part shows.</p>
+
+      <div class="block first">
+        <div class="b-head">Layout</div>
+        <div class="b-sub">What gets drawn into those 32 pixels.</div>
+        <div class="modes" id="modes"></div>
+
+        <div class="previewrow">
+          <div id="canvas">
+            <img id="pv" alt="Tray icon preview">
+            <div id="ph">
+              <div class="ph-mark"><img data-logo src="tray.png" alt="Codenotch"></div>
+              <div class="c-note dim">The plain Codenotch logo is used.<br>No numbers are drawn.</div>
+            </div>
+            <div id="regions"></div>
+          </div>
+          <div class="truth">
+            <div class="c-title" style="font-size:12px">Actual size</div>
+            <div class="c-sub">This is how big it really is in the taskbar.</div>
+            <div class="truthstrip" id="truthstrip"></div>
+            <div class="c-note dim" style="margin-top:6px">Windows picks one of these depending on the display. If a number is unreadable here, it will be unreadable in the taskbar.</div>
+          </div>
+        </div>
+
+        <div class="chips" id="chips"></div>
+      </div>
+
+      <div class="block">
+        <div class="b-head">What each part shows</div>
+        <div class="b-sub">Pick the tool; each part draws that tool's ring.</div>
+        <div class="picker" id="picker"></div>
+      </div>
+    </section>
+
+    <!-- APPEARANCE / Notch ---------------------------------------------------------------- -->
+    <section class="pane" id="pane-notch" role="tabpanel" aria-labelledby="tab-notch" tabindex="0" hidden>
+      <h1 class="p-title">Notch</h1>
+      <p class="p-lede">The small black pill that floats against the right-hand edge of the screen. Each tool you tick gets one ring on it.</p>
+
+      <div class="block first">
+        <div class="b-head">What appears on the pill</div>
+        <div class="b-sub">Click a name to switch its ring on or off.</div>
+        <div class="np-list" id="notch-list"></div>
+        <div class="c-note dim" id="notch-note" style="margin-top:6px"></div>
+      </div>
+
+      <div class="block">
+        <div class="b-head">Size</div>
+        <div class="b-sub">How big the pill is drawn. The same slider sits at the foot of the pill's hover card, so it can be changed from either place.</div>
+        <div class="c-scale">
+          <input id="scale-range" type="range" min="40" max="100" step="5" value="100" aria-label="Notch size">
+          <span class="c-scale-val" id="scale-val">100%</span>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="c-note dim">Whether the pill is on screen at all is a separate switch, under General &rarr; Behaviour.</div>
+      </div>
+    </section>
+
+    <!-- GENERAL / Behaviour ---------------------------------------------------------------- -->
+    <section class="pane" id="pane-behaviour" role="tabpanel" aria-labelledby="tab-behaviour" tabindex="0" hidden>
+      <h1 class="p-title">Behaviour</h1>
+      <p class="p-lede">When Codenotch runs, and what it puts on your screen.</p>
+
+      <div class="block first">
+        <div class="b-head">Starting up</div>
+        <div class="row">
+          <div class="r-text">
+            <div class="r-name">Start with Windows</div>
+            <div class="r-why">Codenotch opens by itself every time you sign in to this computer, and waits quietly in the background until a coding session starts. Turn it off and you have to open Codenotch yourself.</div>
+          </div>
+          <div class="r-ctl"><button class="sw" id="sw-autostart" role="switch" aria-checked="false" aria-label="Start with Windows"><span class="knob"></span></button></div>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="b-head">What is on screen</div>
+        <div class="b-sub">One of these two always stays on. If you hide the notch, the taskbar icon is held on for you, because with both of them gone there would be nothing left to click and no way back to this window.</div>
+        <div class="row">
+          <div class="r-text">
+            <div class="r-name">Show the notch</div>
+            <div class="r-why">The black pill against the right-hand edge of the screen, with one ring per tool. Turn it off and the pill disappears; Codenotch keeps counting your usage either way.</div>
+          </div>
+          <div class="r-ctl"><button class="sw" id="sw-notch" role="switch" aria-checked="true" aria-label="Show the notch"><span class="knob"></span></button></div>
+        </div>
+        <div class="row">
+          <div class="r-text">
+            <div class="r-name">Show the taskbar icon</div>
+            <div class="r-why">The small icon down by the clock. Right-clicking it opens this window, refreshes the readings, or quits Codenotch.</div>
+            <div class="c-note dim" id="tray-lock" style="margin-top:6px" hidden>Held on: the notch is hidden, so this icon is the only way left to reach Codenotch. Switch the notch back on first if you want to hide it.</div>
+          </div>
+          <div class="r-ctl"><button class="sw" id="sw-tray" role="switch" aria-checked="true" aria-label="Show the taskbar icon"><span class="knob"></span></button></div>
+        </div>
+        <div class="fix" id="flags-fix" hidden></div>
+      </div>
+
+      <div class="block"><div class="row"><div class="r-text"><div class="r-name">Codex accounts</div><div class="r-why">View limits across your local Codex profiles.</div></div><div class="r-ctl"><button class="btn" id="btn-accounts" type="button">Open accounts</button></div></div></div>
+      <div class="block">
+        <div class="b-head">Language</div>
+        <div class="row">
+          <div class="r-text">
+            <div class="r-name">Words used by Codenotch</div>
+            <div class="r-why">Sets the language used by Codenotch. “Follow system” uses the language Windows itself is set to.</div>
+          </div>
+          <div class="r-ctl">
+            <select id="lang" aria-label="Language">
+              <option value="auto">Follow system</option>
+              <option value="en">English</option>
+              <option value="zh">&#20013;&#25991;</option>
+              <option value="ja">&#26085;&#26412;&#35486;</option>
+              <option value="ko">&#54620;&#44397;&#50612;</option>
+              <option value="ru">Русский</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GENERAL / Claude Code -------------------------------------------------------------- -->
+    <section class="pane" id="pane-hooks" role="tabpanel" aria-labelledby="tab-hooks" tabindex="0" hidden>
+      <h1 class="p-title">Claude Code</h1>
+      <p class="p-lede">Claude Code can tell Codenotch the moment something happens in a session, instead of Codenotch having to guess from files on disk.</p>
+
+      <div class="block first">
+        <div class="b-head">Session messages</div>
+        <div class="row">
+          <div class="r-text">
+            <div class="r-name">Let Claude Code notify Codenotch</div>
+            <div class="r-why">Turning this on adds a few lines to your Claude Code settings file so that Claude Code sends Codenotch a short message when a session starts, when it is working, when it is waiting for your answer, and when it finishes. That is what makes the ring spin and the amber ring pulse.</div>
+          </div>
+          <div class="r-ctl"><button class="sw" id="sw-hooks" role="switch" aria-checked="false" aria-label="Let Claude Code notify Codenotch"><span class="knob"></span></button></div>
+        </div>
+        <div class="c-note dim" style="margin-top:10px">
+          The file being changed is <span style="user-select:text">.claude\settings.json</span> in your user folder. A dated copy of it is saved before anything is written, and turning this switch off takes the lines out again. Any hooks you added yourself are left alone.
+        </div>
+      </div>
+    </section>
+
+    <!-- GENERAL / About ---------------------------------------------------------------------- -->
+    <section class="pane" id="pane-about" role="tabpanel" aria-labelledby="tab-about" tabindex="0" hidden>
+      <h1 class="p-title">About</h1>
+      <p class="p-lede">What this copy of Codenotch is, and where it keeps its files.</p>
+
+      <div class="block first">
+        <div class="about-top">
+          <img class="about-mark" data-logo src="tray.png" alt="Codenotch">
+          <div>
+            <div class="about-name">Codenotch</div>
+            <div class="about-ver">Version <span id="about-version">0.3.0</span></div>
+          </div>
+        </div>
+        <div class="c-note dim" style="margin-top:10px">Shows how much of your Claude, Codex, Cursor and Antigravity allowance you have used, in the taskbar icon and in a pill at the edge of the screen.</div>
+      </div>
+
+      <div class="block">
+        <div class="b-head">Files</div>
+        <div class="row">
+          <div class="r-text">
+            <div class="r-name">Data folder</div>
+            <div class="r-why">Everything Codenotch remembers lives in one folder: your settings, its log file, and the "glyphs" folder where you can drop your own icons. Opens in File Explorer.</div>
+            <div class="path">%APPDATA%\codenotch</div>
+          </div>
+          <div class="r-ctl"><button class="btn" id="btn-data">Open folder</button></div>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="b-head">If something looks wrong</div>
+        <div class="row">
+          <div class="r-text">
+            <div class="r-name">Put the notch back</div>
+            <div class="r-why">The pill can be dragged up and down the right-hand edge. If it has ended up somewhere you cannot see it — off the bottom of a screen you have unplugged, say — this drops it back into the middle of the edge.</div>
+          </div>
+          <div class="r-ctl"><button class="btn" id="btn-resetpos">Reset position</button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toast">Saved</div>
+
+<script src="settings.js"></script>
+</body>
+</html>

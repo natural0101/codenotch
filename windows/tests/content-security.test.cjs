@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 const root = path.join(__dirname, '../codenotch');
 const html = fs.readFileSync(path.join(root, 'ui/notch.html'), 'utf8');
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const script = fs.readFileSync(path.join(root, 'ui/notch.js'), 'utf8');
 const glyphFunction = script.slice(script.indexOf('function glyphHtml('), script.indexOf('// Provider table'));
 const escapeFunction = script.match(/function esc\(s\)\{[^\n]+/)[0];
 const context = vm.createContext({glyphs:{}});
@@ -17,13 +17,13 @@ test('native hit regions follow panel, card visibility, and DPI without a full-w
   let expanded=false;
   const pill={style:{},rect:[540,140,140,640]};
   const card={rect:[20,180,492,420],classList:{contains:()=>expanded}};
-  const c=vm.createContext({pill,card,window:{devicePixelRatio:2},rectOf:el=>el.rect});
+  const c=vm.createContext({pill,card,tail:{rect:[512,200,64,72]},scalePct:100,window:{devicePixelRatio:2},rectOf:el=>el.rect});
   const fn=script.slice(script.indexOf('function visibleHitRects()'),script.indexOf('function updateHitRegions()'));
   vm.runInContext(fn,c);
   assert.equal(c.visibleHitRects().length,3);
   assert.ok(c.visibleHitRects().every(r=>r[0]>=540));
   expanded=true;
-  assert.equal(c.visibleHitRects().length,4);
+  assert.equal(c.visibleHitRects().length,5);
   assert.equal(c.visibleHitRects()[3],card.rect);
   expanded=false;
   assert.equal(c.visibleHitRects().length,3);
@@ -42,7 +42,7 @@ test('usage refreshes preserve the running indicator and do not reset its animat
   const snapshot = {status:'ok',windows:[{used:0.2}]};
   const c = vm.createContext({pill,glyphs:{},updateHitRegions:()=>{},providers:()=>[{id:'codex',snap:snapshot}],
     headlineOf:s=>s.windows[0],workState:()=>workState,TRACK:'#333',tone:()=>'#fff',staleOf:()=>false});
-  const arc = script.slice(script.indexOf('function svgArc('),script.indexOf('function headline()'));
+  const arc = script.slice(script.indexOf('function svgArc('),script.indexOf('function isStale()'));
   const render = script.slice(script.indexOf('function renderRing()'),script.indexOf('function resetCopy('));
   vm.runInContext(arc+'\n'+render, c);
   c.renderRing();
@@ -86,7 +86,7 @@ test('text and attribute delimiters are escaped', () => {
 });
 test('usage card escapes provider notes and labels', () => {
   const card = {innerHTML:''};
-  const c = vm.createContext({document:{getElementById:()=>card}, hoverId:'codex', stateSnap:{sessions:[]}, activity:[], placeCard:()=>{},updateHitRegions:()=>{}, glyphHtml:()=>'', staleOf:()=>false, tone:()=>'', resetCopy:()=>'',
+  const c = vm.createContext({document:{getElementById:()=>card},uiLang:'en',scalePct:100,wireScaleRow:()=>{},textCopy:s=>s, hoverId:'codex', stateSnap:{sessions:[]}, activity:[], placeCard:()=>{},updateHitRegions:()=>{}, glyphHtml:()=>'', staleOf:()=>false, tone:()=>'', resetCopy:()=>'',
     providers:()=>[{id:'codex',name:'Codex',snap:{status:'ok',windows:[{label:'<img onerror="alert(1)">',used:0.5}],note:'<svg onload="alert(1)">',fetched_at:0}}]});
   const fn = script.slice(script.indexOf('function renderCard()'),script.indexOf('// The card follows'));
   const tasks=script.slice(script.indexOf('const expandedProviders='),script.indexOf('function renderCard()'));
@@ -95,7 +95,7 @@ test('usage card escapes provider notes and labels', () => {
   assert.ok(card.innerHTML.includes('&lt;svg') && card.innerHTML.includes('&lt;img'));
 });
 test('compact tasks truncate text, keep status separate, and expand beyond three', () => {
-  const c=vm.createContext({AMBER:'#fb0',RUNGREEN:'#0f0',stateSnap:{sessions:[]},
+  const c=vm.createContext({uiLang:'ru',AMBER:'#fb0',RUNGREEN:'#0f0',stateSnap:{sessions:[]},
     activity:Array.from({length:5},(_,i)=>({provider:'codex',state:i===4?'waiting':'busy',name:'Задача '+i+' <img onerror="x"> '+ 'длинный текст '.repeat(100)}))});
   const tasks=script.slice(script.indexOf('const expandedProviders='),script.indexOf('function renderCard()'));
   vm.runInContext(escapeFunction+'\n'+tasks,c);
@@ -117,12 +117,23 @@ test('compact tasks truncate text, keep status separate, and expand beyond three
   assert.equal(c.taskRows('claude')[0].name,'Active');
 });
 test('hidden providers disappear, forced providers remain without data, all-hidden is valid', () => {
-  const c=vm.createContext({usage:{status:'ok'},codexSnap:{status:'ok'},cursorSnap:{status:'absent'},agSnap:{status:'absent'}});
+  const c=vm.createContext({notchSlots:null,usage:{status:'ok'},codexSnap:{status:'ok'},cursorSnap:{status:'absent'},agSnap:{status:'absent'}});
   const providers=script.slice(script.indexOf('let providerVisibility='),script.indexOf('function headlineOf('));
   vm.runInContext(providers,c);
-  assert.equal(c.providers().length,0);
+  assert.equal(c.providers().length,2);
   vm.runInContext('providerVisibility={claude:false,codex:true,cursor:true,gemini:false}',c);
   assert.deepEqual(Array.from(c.providers(),p=>p.id),['codex','cursor']);
+  vm.runInContext('providerVisibility={claude:false,codex:false,cursor:false,gemini:false}',c);
+  assert.equal(c.providers().length,0);
+});
+test('notch Settings selection excludes other eligible providers, including Auto', () => {
+  const c=vm.createContext({notchSlots:[{provider:'codex'}],usage:{status:'ok'},codexSnap:{status:'absent'},cursorSnap:{status:'absent'},agSnap:{status:'absent'}});
+  const providers=script.slice(script.indexOf('let providerVisibility='),script.indexOf('function headlineOf('));
+  vm.runInContext(providers,c);
+  vm.runInContext('providerVisibility={claude:true,codex:true,cursor:false,gemini:false}',c);
+  assert.deepEqual(Array.from(c.providers(),p=>p.id),['codex']);
+  vm.runInContext('providerVisibility.codex=false',c);
+  assert.equal(c.providers().length,0, 'no fallback to an unselected eligible provider');
 });
 test('CSP blocks objects, frames, inline handlers and external connections', () => {
   const csp = JSON.parse(fs.readFileSync(path.join(root,'tauri.conf.json'))).app.security.csp;

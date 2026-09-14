@@ -1,6 +1,6 @@
 [package]
 name = "codenotch"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Codenotch for Windows — usage notch for Claude, Codex, Cursor and Antigravity"
 license = "MIT"
@@ -33,6 +33,8 @@ windows = { version = "0.58", features = [
   "Win32_Graphics_Gdi",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_System_Threading",
+  "Win32_System_JobObjects",
+  "Win32_System_Pipes",
   "Win32_Globalization",
   "Win32_System_Console",
 ] }

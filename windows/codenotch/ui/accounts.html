@@ -1,0 +1,7 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Codex accounts</title><link rel="stylesheet" href="accounts.css"></head>
+<body>
+<header><div><p class="eyebrow">CODENOTCH / CODEX</p><h1 id="title">Accounts</h1><p id="subtitle" class="muted"></p></div><button id="refresh" type="button">Refresh</button></header>
+<div class="toolbar"><label for="sort" id="sort-label">Sort by</label><select id="sort"><option value="remaining" id="sort-remaining">Most remaining</option><option value="reset" id="sort-reset">Nearest reset</option></select><span id="count" class="muted"></span></div>
+<p id="error" role="alert" hidden></p><main id="accounts" aria-label="Codex accounts"></main><p id="empty" class="empty" hidden></p><footer id="footnote"></footer>
+<script src="accounts-model.js"></script><script src="accounts.js"></script></body></html>
