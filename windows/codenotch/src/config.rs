@@ -13,8 +13,25 @@ pub struct TraySlot {
     pub provider: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DrawerPreferences {
+    pub show_todos: bool,
+    pub show_services: bool,
+    pub show_memory: bool,
+    pub show_header: bool,
+    pub show_plan: bool,
+    pub show_reset: bool,
+    pub show_updated: bool,
+    pub show_extras: bool,
+    pub show_actions: bool,
+    pub show_active: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default)]
+    pub drawer_preferences: DrawerPreferences,
     #[serde(default = "default_port")]
     pub port: u16,
     /// "auto" | "zh" | "en" | "ja" | "ko" | "ru"
@@ -149,6 +166,7 @@ fn default_lang() -> String {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            drawer_preferences: DrawerPreferences::default(),
             port: default_port(),
             lang: default_lang(),
             bar_x: None,
@@ -252,6 +270,15 @@ pub fn save(cfg: &Config) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn drawer_is_minimal_for_old_and_partial_configs() {
+        assert_eq!(parse_config(Some("{}")).drawer_preferences, DrawerPreferences::default());
+        let cfg = parse_config(Some(r#"{"drawer_preferences":{"showPlan":true}}"#));
+        assert_eq!(cfg.drawer_preferences, DrawerPreferences { show_plan: true, ..Default::default() });
+        let saved = serde_json::to_string(&cfg).unwrap();
+        assert_eq!(parse_config(Some(&saved)).drawer_preferences, cfg.drawer_preferences);
+    }
 
     #[test]
     fn explicit_provider_modes_never_probe() {

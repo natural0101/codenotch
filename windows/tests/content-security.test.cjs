@@ -36,6 +36,16 @@ test('native hit regions follow panel, card visibility, and DPI without a full-w
   pill.style.display='none';
   assert.equal(c.visibleHitRects().length,0);
 });
+test('minimal drawer excludes invisible controls from native hit regions', () => {
+  const card={rect:[76,220,286,58],classList:{contains:()=>true}};
+  const collapse={rect:[366,227,20,44]};
+  const c=vm.createContext({card,drawerPreferences:{showActions:false},rectOf:el=>el.rect,document:{getElementById:()=>collapse}});
+  vm.runInContext(script.slice(script.indexOf('function visibleHitRects()'),script.indexOf('function updateHitRegions()')),c);
+  assert.equal(c.visibleHitRects().length,1);
+  assert.equal(c.visibleHitRects()[0],card.rect);
+  c.drawerPreferences.showActions=true;
+  assert.equal(c.visibleHitRects().length,3);
+});
 test('usage refreshes preserve the running indicator and do not reset its animation', () => {
   let stateWrites = 0, ringWrites = 0, currentState = 'idle', workState = 'running';
   const dataset = {get state(){return currentState;}, set state(v){stateWrites++;currentState=v;}};

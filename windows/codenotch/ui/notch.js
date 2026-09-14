@@ -268,6 +268,7 @@ function renderCard(){
   c.classList.toggle('codex-drawer',p.id==='codex');
   document.getElementById('root').classList.toggle('drawer-open',p.id==='codex');
   if(p.id==='codex'){renderAccountsDrawer(c);placeCard();return;}
+  if(c.dataset)c.dataset.module='';
   const snap=p.snap;
   const headIcon=glyphHtml(p,true);
   let html=`<div class="c-head">${headIcon}<span class="c-title">${uiLang==='ru'?'Использование '+p.name:p.name+' Usage'}</span></div>`;
@@ -335,8 +336,8 @@ card.addEventListener('click',e=>{
 let hideTimer=null,explicitDrawerUntil=0;
 function showCard(){clearTimeout(hideTimer);card.classList.add('show');renderCard();armWatchdog();} // show first, then render: placeCard needs offsetHeight
 document.getElementById('drawer-collapse').addEventListener('click',hideCard);
-function hideCard(){explicitDrawerUntil=0;document.getElementById('root').classList.remove('drawer-open');expandedProviders.clear();card.classList.remove('show');reportHot();}
-function scheduleHide(){if(Date.now()<explicitDrawerUntil)return;clearTimeout(hideTimer);hideTimer=setTimeout(hideCard,450);}
+function hideCard(){setModuleEditing(false);explicitDrawerUntil=0;document.getElementById('root').classList.remove('drawer-open');expandedProviders.clear();card.classList.remove('show');reportHot();}
+function scheduleHide(){if(moduleEditing||Date.now()<explicitDrawerUntil)return;clearTimeout(hideTimer);hideTimer=setTimeout(hideCard,450);}
 // ===== Diagnostics + geometry =====
 function jslog(m){invoke('log_js',{msg:String(m)}).catch(()=>{});}
 function callq(cmd,args){ // invoke with visible failure: any command error is reported on screen (a silent .catch used to swallow them)
@@ -354,7 +355,7 @@ function reportHot(){
 }
 let lastHitRegions='';
 function visibleHitRects(){
-  if(card.classList.contains('show')&&card.classList.contains('codex-drawer')){const c=rectOf(card),b=rectOf(document.getElementById('drawer-collapse'));return [c,b,[c[0]+c[2],b[1],Math.max(0,b[0]-c[0]-c[2]),b[3]]];}
+  if(card.classList.contains('show')&&card.classList.contains('codex-drawer')){const c=rectOf(card);if(!drawerPreferences.showActions)return [c];const b=rectOf(document.getElementById('drawer-collapse'));return [c,b,[c[0]+c[2],b[1],Math.max(0,b[0]-c[0]-c[2]),b[3]]];}
   const p=rectOf(pill),k=window.devicePixelRatio||1,f=26*k*scalePct/100;
   const rects=pill.style.display==='none'?[]:[p,[p[0]+p[2]-f,p[1]-f,f,f],[p[0]+p[2]-f,p[1]+p[3],f,f]];
   if(rects.length&&card.classList.contains('show'))rects.push(rectOf(card),rectOf(tail));
@@ -433,7 +434,7 @@ function cellAt(x,y){
   return null;
 }
 function pointerInHot(x,y){
-  if(card.classList.contains('show')&&hoverId==='codex'){const c=card.getBoundingClientRect(),b=document.getElementById('drawer-collapse').getBoundingClientRect();return inRect(x,y,c,4)||inRect(x,y,b,4);}
+  if(card.classList.contains('show')&&hoverId==='codex'){const c=card.getBoundingClientRect();return inRect(x,y,c,4)||(drawerPreferences.showActions&&inRect(x,y,document.getElementById('drawer-collapse').getBoundingClientRect(),4));}
   const p=pill.getBoundingClientRect();
   if(inRect(x,y,p,4))return true;
   if(!card.classList.contains('show'))return false;
@@ -458,7 +459,7 @@ document.addEventListener('mousemove',e=>{
 document.addEventListener('mouseout',e=>{ // relatedTarget null = the cursor left the page
   if(!e.relatedTarget && card.classList.contains('show')){ if(hideLogged++<5) jslog('mouseout left the page -> collapse'); scheduleHide(); }
 });
-listen('pointer_left',()=>{if(scaleDragging||Date.now()<explicitDrawerUntil)return;clearTimeout(hideTimer);hideCard();}).catch(()=>{});
+listen('pointer_left',()=>{if(moduleEditing||scaleDragging||Date.now()<explicitDrawerUntil)return;clearTimeout(hideTimer);hideCard();}).catch(()=>{});
 // The size can also be changed from the settings window, which is a different window entirely.
 // Ignore it while this page's own slider is being dragged, or the two would fight each other.
 listen('scale',e=>{
@@ -528,17 +529,40 @@ setInterval(renderRing,30_000); // stale state and reset copy move with time
 
 // The account drawer is part of the same edge window and uses its existing hover/hit regions.
 let codexAccounts=[],accountRefreshing=false,accountRefreshTimer=null;
+let drawerPreferences={showTodos:false,showServices:false,showMemory:false,showHeader:false,showPlan:false,showReset:false,showUpdated:false,showExtras:false,showActions:false,showActive:false};
+let moduleSection='codex',moduleEditing=false;
+function setModuleEditing(value){if(moduleEditing===value)return;moduleEditing=value;if(value)clearTimeout(hideTimer);invoke('set_drawer_editing',{editing:value}).catch(e=>notice(String(e)));}
+window.addEventListener('blur',()=>{setModuleEditing(false);scheduleHide();});
+card.addEventListener('pointerdown',e=>{if(e.target.matches('textarea,input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit])')){setModuleEditing(true);invoke('set_drawer_editing',{editing:true}).then(()=>{if(e.target.isConnected)e.target.focus();}).catch(()=>{});}},true);
 let accountSort='remaining';const accountExpanded=new Set();
 try{accountSort=localStorage.getItem('codenotch.accounts.sort')==='reset'?'reset':'remaining';}catch{}
 function redrawAccounts(){if(card.classList.contains('show')&&hoverId==='codex'){renderCard();armWatchdog();}}
 function renderAccountsDrawer(host){
-  window.CodexDrawer.render(host,{accounts:codexAccounts,lang:uiLang,sort:accountSort,expanded:accountExpanded,refreshing:accountRefreshing,
+  const sections=[['codex','Codex','Codex'],...(drawerPreferences.showTodos?[['todos','Дела','Tasks']]:[]),...(drawerPreferences.showServices?[['services','Сервисы','Services']]:[]),...(drawerPreferences.showMemory?[['memory','Память','Memory']]:[])];
+  if(!sections.some(s=>s[0]===moduleSection))moduleSection='codex';
+  if(moduleSection!=='codex'&&host.dataset.module===moduleSection&&host.dataset.moduleLang===uiLang)return;
+  host.dataset.module=moduleSection;
+  host.dataset.moduleLang=uiLang;
+  document.getElementById('root').classList.toggle('drawer-actions',drawerPreferences.showActions);
+  host.title=uiLang==='ru'?'Правый клик — настройки панели':'Right-click for drawer settings';
+  host.replaceChildren();
+  if(sections.length>1){const tabs=document.createElement('nav');tabs.className='module-tabs';tabs.setAttribute('aria-label',uiLang==='ru'?'Разделы':'Sections');for(const [id,ru,en] of sections){const button=document.createElement('button');button.type='button';button.textContent=uiLang==='ru'?ru:en;button.setAttribute('aria-pressed',String(id===moduleSection));button.addEventListener('click',()=>{setModuleEditing(false);moduleSection=id;host.dataset.module='';renderCard();armWatchdog();});tabs.append(button);}host.append(tabs);}
+  const body=document.createElement('div');host.append(body);
+  if(moduleSection!=='codex'){window.CodenotchModules.render(body,{section:moduleSection,lang:uiLang,changed:()=>{placeCard();armWatchdog();},onEditing:setModuleEditing});return;}
+  window.CodexDrawer.render(body,{accounts:codexAccounts,preferences:drawerPreferences,lang:uiLang,sort:accountSort,expanded:accountExpanded,refreshing:accountRefreshing,
     sortChange:()=>{accountSort=accountSort==='remaining'?'reset':'remaining';try{localStorage.setItem('codenotch.accounts.sort',accountSort);}catch{}redrawAccounts();},
     settings:()=>invoke('open_settings').catch(e=>notice(String(e))),
     expand:id=>{if(accountExpanded.has(id))accountExpanded.delete(id);else accountExpanded.add(id);redrawAccounts();},
     refresh:()=>{if(accountRefreshing)return;accountRefreshing=true;redrawAccounts();accountRefreshTimer=setTimeout(()=>{accountRefreshing=false;notice(uiLang==='ru'?'Обновление ещё не завершено':'Refresh still pending');redrawAccounts();},60000);invoke('refresh_usage').catch(e=>{clearTimeout(accountRefreshTimer);accountRefreshing=false;notice(String(e));redrawAccounts();});}
   });
 }
+card.addEventListener('contextmenu',e=>{if(hoverId!=='codex'||e.defaultPrevented)return;e.preventDefault();invoke('open_settings').catch(err=>notice(String(err)));});
+card.addEventListener('dblclick',e=>{if(hoverId==='codex'&&moduleSection==='codex'){e.preventDefault();invoke('open_settings').catch(err=>notice(String(err)));}});
+let drawerPreferencesRevision=0;
+listen('drawer_preferences',e=>{drawerPreferencesRevision++;drawerPreferences={...drawerPreferences,...e.payload};card.dataset.module='';redrawAccounts();}).then(()=>{
+  const revision=drawerPreferencesRevision;
+  return invoke('get_drawer_preferences').then(p=>{if(revision!==drawerPreferencesRevision)return;drawerPreferences={...drawerPreferences,...p};redrawAccounts();});
+}).catch(e=>notice(String(e)));
 invoke('get_codex_accounts').then(a=>{codexAccounts=Array.isArray(a)?a:[];redrawAccounts();}).catch(e=>notice(String(e)));
 listen('codex_accounts',e=>{if(!Array.isArray(e.payload))return;codexAccounts=e.payload;accountRefreshing=false;clearTimeout(accountRefreshTimer);redrawAccounts();}).catch(()=>{});
 function openAccountsDrawer(){explicitDrawerUntil=Date.now()+8000;hoverId='codex';showCard();}

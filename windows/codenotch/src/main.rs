@@ -20,6 +20,8 @@ mod activity;
 mod diag;
 mod watcher;
 mod window_region;
+mod todos;
+mod modules;
 
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
@@ -28,7 +30,7 @@ use tauri::{AppHandle, Emitter, Manager};
 /// and its tail on the left. `fitZoom` in ui/notch.html divides by the same width.
 pub const NOTCH_W: f64 = 390.0;
 /// Hand-bumped build tag, written to run.log at startup so a log can always be matched to the exe that wrote it.
-pub const BUILD: &str = "r33-compact-drawer";
+pub const BUILD: &str = "r35-optional-modules";
 pub const NOTCH_H: f64 = 520.0; // 300 clipped the card once it held three window blocks plus the session list; 460 clipped Antigravity's two model groups once the reading was stale and an agent was working
 
 pub struct AppState {
@@ -334,6 +336,67 @@ fn get_codex_accounts() -> Vec<codex::CodexAccount> {
 }
 
 #[tauri::command]
+fn get_drawer_preferences(app: AppHandle) -> config::DrawerPreferences {
+    app.state::<AppState>().cfg.lock().unwrap().drawer_preferences.clone()
+}
+
+#[tauri::command]
+fn get_todos() -> Result<Vec<todos::Todo>, String> { todos::list() }
+#[tauri::command]
+fn add_todo(text: String) -> Result<Vec<todos::Todo>, String> { todos::add(text) }
+#[tauri::command]
+fn update_todo(id: String, text: Option<String>, completed: Option<bool>) -> Result<Vec<todos::Todo>, String> { todos::update(id, text, completed) }
+#[tauri::command]
+fn delete_todo(id: String) -> Result<Vec<todos::Todo>, String> { todos::delete(id) }
+#[tauri::command]
+fn reorder_todos(ids: Vec<String>) -> Result<Vec<todos::Todo>, String> { todos::reorder(ids) }
+#[tauri::command]
+fn get_services() -> Result<Vec<modules::Service>, String> { modules::get_services() }
+#[tauri::command]
+fn add_service(name: String, url: String, description: String) -> Result<Vec<modules::Service>, String> { modules::add_service(name,url,description) }
+#[tauri::command]
+fn delete_service(id: String) -> Result<Vec<modules::Service>, String> { modules::delete_service(id) }
+#[tauri::command]
+fn get_memory() -> Result<modules::MemoryIndex,String> { modules::get_memory() }
+#[tauri::command]
+fn read_memory(id: String) -> Result<modules::MemoryText,String> { modules::read_memory(id) }
+#[tauri::command]
+fn set_memory_root(path: String) -> Result<modules::MemoryIndex,String> { modules::set_memory_root(path) }
+#[tauri::command]
+fn get_focus() -> Result<String,String> { modules::get_focus() }
+#[tauri::command]
+fn set_focus(text: String) -> Result<String,String> { modules::set_focus(text) }
+
+static DRAWER_EDITING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+#[tauri::command]
+fn set_drawer_editing(app: AppHandle, editing: bool) {
+    DRAWER_EDITING.store(editing, std::sync::atomic::Ordering::Relaxed);
+    if !editing { noactivate(&app); return; }
+    if let Some(w) = app.get_webview_window("notch") {
+        #[cfg(windows)]
+        if let Ok(h) = w.hwnd() {
+            use windows::Win32::UI::WindowsAndMessaging::{GetWindowLongPtrW,SetWindowLongPtrW,GWL_EXSTYLE,WS_EX_NOACTIVATE};
+            unsafe { let hwnd=windows::Win32::Foundation::HWND(h.0 as isize as *mut core::ffi::c_void); let ex=GetWindowLongPtrW(hwnd,GWL_EXSTYLE); SetWindowLongPtrW(hwnd,GWL_EXSTYLE,ex & !(WS_EX_NOACTIVATE.0 as isize)); }
+        }
+        let _ = w.set_focus();
+    }
+}
+
+#[tauri::command]
+fn set_drawer_preferences(app: AppHandle, preferences: config::DrawerPreferences) -> Result<config::DrawerPreferences, String> {
+    let state = app.state::<AppState>();
+    let mut cfg = state.cfg.lock().map_err(|e| e.to_string())?;
+    let mut next = cfg.clone();
+    next.drawer_preferences = preferences.clone();
+    let text = serde_json::to_string_pretty(&next).map_err(|e| e.to_string())?;
+    std::fs::write(config::config_path(), text).map_err(|e| e.to_string())?;
+    *cfg = next;
+    drop(cfg);
+    let _ = app.emit("drawer_preferences", &preferences);
+    Ok(preferences)
+}
+
+#[tauri::command]
 fn open_codex_accounts(app: AppHandle) {
     DRAWER_REQUEST.store(true, std::sync::atomic::Ordering::Relaxed);
     DRAWER_HOLD_UNTIL.store(epoch_ms() + 8000, std::sync::atomic::Ordering::Relaxed);
@@ -542,7 +605,7 @@ fn start_pointer_watchdog(app: AppHandle) {
                 ));
             }
 
-            if !EXPANDED.load(std::sync::atomic::Ordering::Relaxed) {
+            if !EXPANDED.load(std::sync::atomic::Ordering::Relaxed) || DRAWER_EDITING.load(std::sync::atomic::Ordering::Relaxed) {
                 miss = 0;
                 continue;
             }
@@ -1184,6 +1247,22 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             window_region::set_hit_regions,
             get_codex_accounts,
+            get_drawer_preferences,
+            get_todos,
+            add_todo,
+            update_todo,
+            delete_todo,
+            reorder_todos,
+            get_services,
+            add_service,
+            delete_service,
+            get_memory,
+            read_memory,
+            set_memory_root,
+            get_focus,
+            set_focus,
+            set_drawer_editing,
+            set_drawer_preferences,
             get_provider_visibility,
             open_codex_accounts,
             take_codex_drawer_request,

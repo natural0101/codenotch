@@ -39,6 +39,15 @@ function band(p){ return p < 50 ? '#4ade80' : p < 80 ? '#facc15' : '#f87171'; }
 const ORDER = ['claude', 'codex', 'cursor', 'gemini'];
 const FALLBACK_LABEL = { claude:'Claude', codex:'Codex', cursor:'Cursor', gemini:'Antigravity' };
 const RU_STATIC = {
+  'Codex account panel':'Панель аккаунтов Codex',
+  'Tasks section':'Раздел «Дела»', 'Services section':'Раздел «Сервисы»', 'Knowledge section':'Раздел «Память»',
+  'By default, only the account and remaining allowance are shown.':'По умолчанию — только аккаунт и остаток лимита.',
+  'Header':'Заголовок', 'Plan':'Тариф', 'Reset time':'Время сброса',
+  'Updated time':'Время обновления', 'Other limits':'Другие лимиты',
+  'Action buttons':'Кнопки управления', 'Highlight default account':'Выделение основного аккаунта',
+  'Could not save account panel preferences.':'Не удалось сохранить настройки панели аккаунтов.',
+  'Could not load account panel preferences.':'Не удалось загрузить настройки панели аккаунтов.',
+  'Could not follow account panel preferences.':'Не удалось получать изменения настроек панели аккаунтов.',
   'Codex accounts':'Аккаунты Codex',
   'View limits across your local Codex profiles.':'Лимиты ваших локальных профилей Codex.',
   'Open accounts':'Открыть аккаунты',
@@ -643,6 +652,55 @@ document.getElementById('notch-list').addEventListener('change', e => {
     .catch(err => { renderNotch(); strip('set_antigravity_prefs failed: ' + errText(err)); });
 });
 
+/* ---- optional account drawer details ----------------------------------- */
+const DRAWER_KEYS = ['showTodos', 'showServices', 'showMemory', 'showHeader', 'showPlan', 'showReset', 'showUpdated', 'showExtras', 'showActions', 'showActive'];
+let drawerPreferences = Object.fromEntries(DRAWER_KEYS.map(key => [key, false]));
+let drawerPreferencesReady = false, drawerPreferencesBusy = false, drawerPreferencesRevision = 0;
+function readDrawerPreferences(value){
+  return Object.fromEntries(DRAWER_KEYS.map(key => [key, !!value && value[key] === true]));
+}
+function renderDrawerPreferences(){
+  for(const box of document.querySelectorAll('[data-drawer-pref]')){
+    box.checked = drawerPreferences[box.dataset.drawerPref] === true;
+    box.disabled = !drawerPreferencesReady || drawerPreferencesBusy;
+  }
+}
+function receiveDrawerPreferences(value){
+  if(!value || typeof value !== 'object' || Array.isArray(value)) return;
+  drawerPreferences = readDrawerPreferences(value);
+  drawerPreferencesReady = true;
+  drawerPreferencesRevision++;
+  renderDrawerPreferences();
+}
+document.getElementById('drawer-preferences').addEventListener('change', e => {
+  const box = e.target.closest('[data-drawer-pref]');
+  if(!box || !DRAWER_KEYS.includes(box.dataset.drawerPref) || !drawerPreferencesReady || drawerPreferencesBusy) return;
+  const preferences = Object.assign({}, drawerPreferences, { [box.dataset.drawerPref]: box.checked });
+  drawerPreferencesBusy = true;
+  for(const input of document.querySelectorAll('[data-drawer-pref]')) input.disabled = true;
+  invoke('set_drawer_preferences', { preferences })
+    .then(value => { receiveDrawerPreferences(value); toast(ui('Saved', 'Saved')); })
+    .catch(() => strip(ui('Could not save account panel preferences.', 'Could not save account panel preferences.')))
+    .finally(() => { drawerPreferencesBusy = false; renderDrawerPreferences(); });
+});
+function loadDrawerPreferences(){
+  const revision = drawerPreferencesRevision;
+  return invoke('get_drawer_preferences')
+    .then(value => { if(drawerPreferencesRevision === revision) receiveDrawerPreferences(value); })
+    .catch(() => strip(ui('Could not load account panel preferences.', 'Could not load account panel preferences.')));
+}
+function startDrawerPreferences(){
+  renderDrawerPreferences();
+  const event = window.__TAURI__ && window.__TAURI__.event;
+  const subscription = event && typeof event.listen === 'function'
+    ? event.listen('drawer_preferences', e => receiveDrawerPreferences(e.payload))
+    : Promise.resolve();
+  // Subscribe before reading so a concurrent settings change cannot be lost.
+  Promise.resolve(subscription)
+    .catch(() => strip(ui('Could not follow account panel preferences.', 'Could not follow account panel preferences.')))
+    .then(loadDrawerPreferences);
+}
+
 /* ---- notch size -------------------------------------------------------- */
 function clampPct(v){
   const n = Math.round(Number(v));
@@ -810,6 +868,7 @@ document.getElementById('btn-resetpos').addEventListener('click', () => {
 
 /* ---- start ------------------------------------------------------------- */
 function boot(){
+  startDrawerPreferences();
   setUiLanguage('auto');
   showTab(savedTab());
   render();   // draw something immediately, even if every command below fails

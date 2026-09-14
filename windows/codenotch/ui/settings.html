@@ -226,6 +226,15 @@
   .c-scale input[type=range]:hover::-webkit-slider-thumb{background:#b0b0b3}
   .c-scale-val{font-size:11px;color:#c8c8c8;min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
 
+  /* Optional details in the Codex account drawer. */
+  .drawer-prefs{border:0;border-top:1px solid #1e1e1e;margin:20px 0 0;padding:16px 0 0;min-width:0}
+  .drawer-prefs legend{padding:0 8px 0 0}
+  .drawer-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:11px 16px;margin-top:14px}
+  .drawer-option{display:flex;align-items:center;gap:8px;font-size:12px;color:#e8e8ea;cursor:pointer;min-width:0}
+  .drawer-option input{margin:0;flex:0 0 auto;accent-color:#c8c8c8}
+  .drawer-option input:focus-visible{outline:1px solid #8a8a8a;outline-offset:3px}
+  .drawer-option:has(input:disabled){opacity:.55;cursor:default}
+
   /* About */
   .about-top{display:flex;align-items:center;gap:12px;margin-top:16px}
   .about-mark{width:40px;height:40px;image-rendering:pixelated;display:block;flex:0 0 auto}
@@ -320,6 +329,23 @@
           <span class="c-scale-val" id="scale-val">100%</span>
         </div>
       </div>
+
+      <fieldset class="drawer-prefs" id="drawer-preferences" aria-describedby="drawer-preferences-note">
+        <legend class="b-head">Codex account panel</legend>
+        <div class="b-sub" id="drawer-preferences-note">By default, only the account and remaining allowance are shown.</div>
+        <div class="drawer-options">
+          <label class="drawer-option"><input type="checkbox" data-drawer-pref="showTodos" disabled><span>Tasks section</span></label>
+          <label class="drawer-option"><input type="checkbox" data-drawer-pref="showServices" disabled><span>Services section</span></label>
+          <label class="drawer-option"><input type="checkbox" data-drawer-pref="showMemory" disabled><span>Knowledge section</span></label>
+          <label class="drawer-option"><input type="checkbox" data-drawer-pref="showHeader" disabled><span>Header</span></label>
+          <label class="drawer-option"><input type="checkbox" data-drawer-pref="showPlan" disabled><span>Plan</span></label>
+          <label class="drawer-option"><input type="checkbox" data-drawer-pref="showReset" disabled><span>Reset time</span></label>
+          <label class="drawer-option"><input type="checkbox" data-drawer-pref="showUpdated" disabled><span>Updated time</span></label>
+          <label class="drawer-option"><input type="checkbox" data-drawer-pref="showExtras" disabled><span>Other limits</span></label>
+          <label class="drawer-option"><input type="checkbox" data-drawer-pref="showActions" disabled><span>Action buttons</span></label>
+          <label class="drawer-option"><input type="checkbox" data-drawer-pref="showActive" disabled><span>Highlight default account</span></label>
+        </div>
+      </fieldset>
 
       <div class="block">
         <div class="c-note dim">Whether the pill is on screen at all is a separate switch, under General &rarr; Behaviour.</div>
