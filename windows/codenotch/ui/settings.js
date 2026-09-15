@@ -47,23 +47,21 @@ function settingsGlyph(id){
 }
 
 function decorateNavigation(){
-  // Original two-tone geometric badges, inspired by the user's selected neon reference.
-  const lime='#d8f34b',pink='#f77bea',violet='#683af0',cream='#f6f4db',charcoal='#242523';
-  const burst=Array.from({length:24},(_,i)=>{const angle=(i*15-90)*Math.PI/180,r=i%2?11.8:15.4;return (i?'L':'M')+(16+Math.cos(angle)*r).toFixed(2)+' '+(16+Math.sin(angle)*r).toFixed(2);}).join(' ')+'Z';
+  // Decorative artwork is packaged locally; labels remain the accessible tab names.
   const icons={
-    tray:[['circle',{cx:16,cy:16,r:15,fill:lime}],['rect',{x:6.5,y:8.5,width:19,height:13.5,rx:3,fill:charcoal}],['rect',{x:9,y:11,width:14,height:8,rx:1,fill:lime}],['path',{d:'M14 22h4v2h3v2H11v-2h3Z',fill:charcoal}]],
-    notch:[['rect',{x:1,y:1,width:30,height:30,rx:10,fill:pink}],['path',{d:'M8.5 7.5h15a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Zm.5 3v11h14v-11H9Z',fill:charcoal,'fill-rule':'evenodd'}],['path',{d:'M25 12h-4a3 3 0 0 0-3 3v2a3 3 0 0 0 3 3h4Z',fill:charcoal}]],
-    modules:[['rect',{x:4.7,y:4.7,width:22.6,height:22.6,rx:4,transform:'rotate(45 16 16)',fill:violet}],['circle',{cx:16,cy:10.5,r:3.35,fill:cream}],['circle',{cx:10.5,cy:20,r:3.35,fill:cream}],['circle',{cx:21.5,cy:20,r:3.35,fill:cream}]],
-    behaviour:[['path',{d:burst,fill:lime}],['circle',{cx:16,cy:16,r:8.2,fill:'none',stroke:charcoal,'stroke-width':2}],['circle',{cx:16,cy:16,r:3.8,fill:charcoal}]],
-    hooks:[['circle',{cx:16,cy:16,r:15,fill:violet}],['path',{d:'M16 4.5 18.6 12.4 25.8 7.2 21.3 14 28 16 21.3 18 25.8 24.8 18.6 19.6 16 27.5 13.4 19.6 6.2 24.8 10.7 18 4 16 10.7 14 6.2 7.2 13.4 12.4Z',fill:cream}]],
-    about:[['circle',{cx:16,cy:16,r:15,fill:charcoal}],['circle',{cx:16,cy:16,r:9.5,fill:'none',stroke:lime,'stroke-width':1.65}],['path',{d:'M6.5 16h19M16 6.5c-6 4-6 15 0 19m0-19c6 4 6 15 0 19M16 6.5v19M8.5 11.5c5 2 10 2 15 0M8.5 20.5c5-2 10-2 15 0',fill:'none',stroke:lime,'stroke-width':1.5}]]
+    tray:'icons/plush/tray.png',
+    notch:'icons/plush/notch.png',
+    modules:'icons/plush/modules.png',
+    behaviour:'icons/plush/behaviour.png',
+    hooks:'icons/plush/hooks.png',
+    about:'icons/plush/about.png'
   };
-  for(const [id,shapes] of Object.entries(icons)){
+  for(const [id,src] of Object.entries(icons)){
     const button=document.getElementById('tab-'+id);if(!button)continue;
     button.querySelector('.settings-nav-icon')?.remove();
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    for(const [key,value] of Object.entries({class:'settings-nav-icon',viewBox:'0 0 32 32','aria-hidden':'true',focusable:'false',fill:'none','stroke-linecap':'round','stroke-linejoin':'round'}))svg.setAttribute(key,value);
-    for(const [tag,attributes] of shapes){const shape=document.createElementNS(svg.namespaceURI,tag);for(const [key,value] of Object.entries(attributes))shape.setAttribute(key,String(value));svg.append(shape);}button.prepend(svg);
+    const icon=document.createElement('img');
+    for(const [key,value] of Object.entries({class:'settings-nav-icon',src,alt:'','aria-hidden':'true',draggable:'false',tabindex:'-1'}))icon.setAttribute(key,value);
+    button.prepend(icon);
   }
 }
 

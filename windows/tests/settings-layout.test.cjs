@@ -174,7 +174,7 @@ test('live preview follows selected provider IDs and scale without fabricated us
   }
 });
 
-test('navigation glyphs preserve labelled buttons and stay hidden from accessible names', () => {
+test('local plush images preserve labelled buttons and stay hidden from accessible names', () => {
   const tabs = Array.from(declaration('TABS'));
   const buttons = Object.fromEntries(tabs.map(id => [id, {
     textContent: id, children: [],
@@ -184,7 +184,7 @@ test('navigation glyphs preserve labelled buttons and stay hidden from accessibl
   const c = contextFor(['decorateNavigation'], {
     document: {
       getElementById: id => buttons[id.replace('tab-', '')],
-      createElementNS: (namespaceURI, tag) => ({ namespaceURI, tag, attributes: {}, children: [], setAttribute(k, v) { this.attributes[k] = v; }, append(node) { this.children.push(node); } }),
+      createElement: tag => ({ tag, attributes: {}, setAttribute(k, v) { this.attributes[k] = v; } }),
     },
   });
   c.decorateNavigation();
@@ -193,26 +193,31 @@ test('navigation glyphs preserve labelled buttons and stay hidden from accessibl
     const button = buttons[id];
     assert.equal(button.textContent, id);
     assert.equal(button.children.length, 1);
-    assert.equal(button.children[0].tag, 'svg');
-    assert.equal(button.children[0].attributes['aria-hidden'], 'true');
-    assert.equal(button.children[0].attributes.focusable, 'false');
-    assert.equal(button.children[0].attributes.viewBox, '0 0 32 32');
-    assert.equal(button.children[0].attributes.fill, 'none');
-    assert.equal(button.children[0].attributes.stroke, undefined, 'filled badge must not inherit a root outline');
-    assert.ok(button.children[0].children.length > 0);
-    let filled = 0;
-    for (const shape of button.children[0].children) {
-      assert.ok(['path', 'rect', 'circle'].includes(shape.tag));
-      assert.ok(Object.keys(shape.attributes).length > 0);
-      assert.ok(shape.attributes.fill === 'none' || /^#[a-f0-9]{6}$/i.test(shape.attributes.fill), 'every shape has an explicit safe fill');
-      if (shape.attributes.fill !== 'none') filled++;
-      else assert.match(shape.attributes.stroke, /^#[a-f0-9]{6}$/i);
-      for (const [attribute, value] of Object.entries(shape.attributes)) {
-        assert.doesNotMatch(attribute, /^on|href|style/i);
-        assert.doesNotMatch(String(value), /NaN|Infinity|url\(/);
-      }
+    const icon = button.children[0];
+    assert.equal(icon.tag, 'img');
+    assert.equal(icon.attributes['aria-hidden'], 'true');
+    assert.equal(icon.attributes.alt, '');
+    assert.equal(icon.attributes.tabindex, '-1');
+    assert.equal(icon.attributes.draggable, 'false');
+    assert.equal(icon.attributes.src, `icons/plush/${id}.png`);
+    assert.doesNotMatch(icon.attributes.src, /:|\.\.|[<>"']/);
+    for (const attribute of Object.keys(icon.attributes)) {
+      assert.ok(['class', 'src', 'alt', 'aria-hidden', 'draggable', 'tabindex'].includes(attribute));
     }
-    assert.ok(filled > 0, 'each navigation badge includes solid geometry');
+  }
+});
+
+test('every plush navigation image is packaged as a real PNG', () => {
+  const root = path.resolve(__dirname, '../codenotch/ui');
+  for (const id of Array.from(declaration('TABS'))) {
+    const file = path.resolve(root, 'icons/plush', `${id}.png`);
+    assert.ok(file.startsWith(root + path.sep));
+    assert.ok(fs.existsSync(file), `${id} image is packaged`);
+    const bytes = fs.readFileSync(file);
+    assert.ok(bytes.length > 33, `${id} has PNG content`);
+    assert.deepEqual(bytes.subarray(0, 8), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    assert.equal(bytes.subarray(12, 16).toString('ascii'), 'IHDR');
+    assert.ok(bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0, `${id} dimensions are valid`);
   }
 });
 
