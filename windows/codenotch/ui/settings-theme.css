@@ -97,11 +97,11 @@ select{max-width:100%;padding-right:24px}select option{background:#ffffff;color:
 /* Plush navigation artwork sits directly on the quiet sidebar surface. */
 #side .tab{gap:10px;min-height:52px;padding:7px 8px}
 #side .tab img.settings-nav-icon{display:block;width:38px;height:38px;flex:0 0 38px;object-fit:contain;filter:none;border:0;border-radius:0;background:none;pointer-events:none;user-select:none}
-#side .tab.on{background:#e8ebef}
+#side .tab.on{background:#e2ece6}
 .provider-mark{width:32px;height:32px;flex:0 0 32px;border-radius:10px;background:#eceeef;color:#30343b}
 .provider-mark img,.provider-mark svg{width:22px;height:22px;object-fit:contain}
-.provider-mark[data-provider=claude]{background:#f2e5df}
-.provider-mark[data-provider=codex]{background:#e8ebee}
+.provider-mark[data-provider=claude]{background:#e1eee5}
+.provider-mark[data-provider=codex]{background:#e3eee8}
 .provider-mark[data-provider=cursor]{background:#ebe7f2}
 .provider-mark[data-provider=gemini]{background:#e4eee6}
 .provider-mark img.settings-provider-image{filter:brightness(0)}
@@ -111,3 +111,10 @@ select{max-width:100%;padding-right:24px}select option{background:#ffffff;color:
 .preview-provider img{filter:brightness(0)}
 @media(max-width:680px){#side .tab{gap:9px;min-height:48px;padding:7px 8px}#side .tab img.settings-nav-icon{width:34px;height:34px;flex-basis:34px}.provider-options{margin-left:56px}}
 #side .tab img.settings-nav-icon{mix-blend-mode:multiply}
+
+/* Green foundation with violet accents, retaining the plush luminance and depth. */
+#side .tab img.settings-nav-icon{filter:url(#plush-green)}
+#side #tab-modules img.settings-nav-icon{filter:url(#plush-violet)}
+#side #tab-hooks img.settings-nav-icon{filter:none}
+#plush-color-filters{position:fixed;width:0;height:0;overflow:hidden;pointer-events:none}
+.settings-brand img.brand-symbol{filter:none;width:40px;height:40px;flex:0 0 40px;object-fit:contain;mix-blend-mode:multiply;border-radius:0}

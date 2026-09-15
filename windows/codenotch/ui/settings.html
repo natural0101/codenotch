@@ -257,11 +257,12 @@
 <link rel="stylesheet" href="settings-theme.css">
 </head>
 <body>
+<svg id="plush-color-filters" width="0" height="0" aria-hidden="true"><defs><filter id="plush-green" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".15945 .5364 .05415 0 .25 .1063 .3576 .0361 0 .50 .144568 .486336 .049096 0 .32 0 0 0 1 0"/><feComponentTransfer><feFuncR type="gamma" amplitude="1" exponent="2" offset="0"/><feFuncG type="gamma" amplitude="1" exponent="2" offset="0"/><feFuncB type="gamma" amplitude="1" exponent="2" offset="0"/></feComponentTransfer></filter><filter id="plush-violet" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".131812 .443424 .044764 0 .38 .165828 .557856 .056316 0 .22 .09567 .32184 .03249 0 .55 0 0 0 1 0"/><feComponentTransfer><feFuncR type="gamma" amplitude="1" exponent="2" offset="0"/><feFuncG type="gamma" amplitude="1" exponent="2" offset="0"/><feFuncB type="gamma" amplitude="1" exponent="2" offset="0"/></feComponentTransfer></filter></defs></svg>
 <div id="shell">
 
   <!-- ---- the tab list ------------------------------------------------------------------ -->
   <nav id="side" role="tablist" aria-orientation="vertical" aria-label="Settings sections">
-    <div class="settings-brand"><svg class="brand-symbol" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="10" fill="#683af0"/><path d="M22 10a8 8 0 1 0 0 12" fill="none" stroke="#f6f4db" stroke-width="2.5" stroke-linecap="round"/><path d="M21 15h4v2h-4z" fill="#f6f4db"/></svg><span>Codenotch<small>Settings</small></span></div>
+    <div class="settings-brand"><img class="brand-symbol" src="icons/plush/brand.png" alt="" aria-hidden="true"><span>Codenotch<small>Settings</small></span></div>
     <div class="s-group first">Appearance</div>
     <button class="tab" id="tab-tray" role="tab" aria-controls="pane-tray" aria-selected="false" tabindex="-1">Taskbar icon</button>
     <button class="tab" id="tab-notch" role="tab" aria-controls="pane-notch" aria-selected="false" tabindex="-1">Notch</button>
@@ -448,7 +449,7 @@
           <img class="about-mark" data-logo src="tray.png" alt="Codenotch">
           <div>
             <div class="about-name">Codenotch</div>
-            <div class="about-ver">Version <span id="about-version">0.5.4</span></div>
+            <div class="about-ver">Version <span id="about-version">0.5.5</span></div>
           </div>
         </div>
         <div class="c-note dim" style="margin-top:10px">Usage and local tools, always within reach.</div>
